@@ -4,16 +4,31 @@
 // Adding a new tool later = one entry here + one force function + one
 // visualization case in ui.js. Nothing else changes.
 
-// Wind-Jet's cone reach ("range") is fixed — the only two things the
-// player controls directly on the element are its length (-> strength)
-// and its angle (-> direction). Attractor/Repulsor expose a single visual
-// "power" handle on the ring edge; radius and strength both derive from
-// where that handle sits, so there's effectively one on-canvas control.
-export const WIND_JET_RANGE = 0.28;
+// Wind-Jet's cone reach scales with its strength (fully extended handle
+// = WIND_JET_RANGE; the player controls length -> strength and angle ->
+// direction directly on the element, and the cone grows/shrinks with the
+// former). Attractor/Repulsor expose a single visual "power" handle on
+// the ring edge; radius and strength both derive from where that handle
+// sits, so there's effectively one on-canvas control.
+export const WIND_JET_RANGE = 0.28; // reach at max strength (handle fully extended)
 export const WIND_JET_MIN_STRENGTH = 0.15;
-export const WIND_JET_MAX_STRENGTH = 0.9;
+export const WIND_JET_MAX_STRENGTH = 0.9; // also the particle speed cap at full extension
 export const WIND_JET_MIN_LEN_CSS = 30;
 export const WIND_JET_MAX_LEN_CSS = 300; // long drag range for granular strength control
+
+// How quickly a particle's velocity is steered toward the wind's target
+// velocity (direction * strength) while inside the cone — higher = snaps
+// to the target speed faster. Not user-facing, just a feel constant.
+const WIND_JET_STEER_GAIN = 8;
+
+// The cone's actual reach at the tool's current strength — scales
+// linearly from ~0 at WIND_JET_MIN_STRENGTH up to WIND_JET_RANGE at
+// WIND_JET_MAX_STRENGTH. Shared by the physics force check and every
+// visual (boundary wedge, ambient fx, click footprint) so they never
+// drift out of sync with each other.
+export function windJetEffectiveRange(strength) {
+  return WIND_JET_RANGE * (strength / WIND_JET_MAX_STRENGTH);
+}
 
 export const RADIAL_MIN_RADIUS = 0.05;
 export const RADIAL_MAX_RADIUS = 0.32;
@@ -77,12 +92,16 @@ export function normalizeAngle(a) {
   return a;
 }
 
-// Returns [fx, fy] contributed by one tool on a particle at (px, py).
-function windJetForce(tool, px, py) {
+// Returns [fx, fy] contributed by one tool on a particle at (px, py)
+// moving at (vx, vy). Wind-Jet steers velocity toward a target (rather
+// than applying a constant accelerating force) so `strength` reads as a
+// real speed cap: a particle that stays in the cone long enough settles
+// at very close to `strength`, never runs away past it.
+function windJetForce(tool, px, py, vx, vy) {
   const dx = px - tool.position.x;
   const dy = py - tool.position.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist > tool.radius) return [0, 0];
+  if (dist > windJetEffectiveRange(tool.strength)) return [0, 0];
 
   const dirRad = (tool.params.direction || 0) * Math.PI / 180;
   const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
@@ -90,7 +109,9 @@ function windJetForce(tool, px, py) {
   const diff = normalizeAngle(angleToParticle - dirRad);
   if (Math.abs(diff) > spreadRad / 2) return [0, 0];
 
-  return [Math.cos(dirRad) * tool.strength, Math.sin(dirRad) * tool.strength];
+  const targetVx = Math.cos(dirRad) * tool.strength;
+  const targetVy = Math.sin(dirRad) * tool.strength;
+  return [(targetVx - vx) * WIND_JET_STEER_GAIN, (targetVy - vy) * WIND_JET_STEER_GAIN];
 }
 
 function radialForce(tool, px, py, sign) {
@@ -111,11 +132,11 @@ function radialForce(tool, px, py, sign) {
   return [sign * nx * magnitude, sign * ny * magnitude];
 }
 
-function attractorForce(tool, px, py) {
+function attractorForce(tool, px, py, vx, vy) {
   return radialForce(tool, px, py, 1);
 }
 
-function repulsorForce(tool, px, py) {
+function repulsorForce(tool, px, py, vx, vy) {
   return radialForce(tool, px, py, -1);
 }
 
@@ -129,7 +150,7 @@ const FORCE_FUNCTIONS = {
 // with ambient force + the sum of every active tool's force, for the first
 // `count` particles.
 export function accumulateForces(pool, activeTools, ambientForce, outFx, outFy) {
-  const { px, py, count } = pool;
+  const { px, py, vx, vy, count } = pool;
   const ax = (ambientForce && ambientForce.x) || 0;
   const ay = (ambientForce && ambientForce.y) || 0;
 
@@ -142,7 +163,7 @@ export function accumulateForces(pool, activeTools, ambientForce, outFx, outFy) 
     const fn = FORCE_FUNCTIONS[tool.type];
     if (!fn) continue;
     for (let i = 0; i < count; i++) {
-      const [fx, fy] = fn(tool, px[i], py[i]);
+      const [fx, fy] = fn(tool, px[i], py[i], vx[i], vy[i]);
       outFx[i] += fx;
       outFy[i] += fy;
     }

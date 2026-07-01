@@ -17,15 +17,16 @@
 // still letting the player stretch them into streaks/comets.
 //
 // Motion per type:
-//  - wind_jet: head drifts outward from the center through the fixed
-//    cone in the wind direction (gentle sinusoidal "gust" wobble).
+//  - wind_jet: head drifts outward from the center through the cone
+//    (whose reach scales with strength) in the wind direction (gentle
+//    sinusoidal "gust" wobble).
 //  - attractor: head races inward from the ring edge toward the center
 //    (accelerating, with a slow curl) — a graceful pull.
 //  - repulsor: head blasts outward from the center to the ring edge
 //    (decelerating, matching the force's real falloff).
 
 import { toPixel, toPixelLength } from './coords.js';
-import { WIND_JET_RANGE } from './tools.js';
+import { windJetEffectiveRange } from './tools.js';
 import { sampleGradient } from './colorSchemes.js';
 
 function fadeOutAlpha(progress) {
@@ -112,7 +113,7 @@ class ToolFx {
     const center = toPixel(tool.position.x, tool.position.y);
     const dirRad = (tool.params.direction || 0) * Math.PI / 180;
     const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
-    const baseRange = toPixelLength(WIND_JET_RANGE);
+    const baseRange = toPixelLength(windJetEffectiveRange(tool.strength));
     const segLen = cfg.length * dpr;
 
     for (const p of this.particles) {

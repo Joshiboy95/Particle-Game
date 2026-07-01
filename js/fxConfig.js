@@ -9,8 +9,6 @@
 // code is needed. The tool's actual motion/rendering in toolFx.js still
 // needs its own code, same as any new tool does.
 
-import { DEFAULT_SCHEME, DEFAULT_CUSTOM_STOPS } from './colorSchemes.js';
-
 const KEY = 'particle_flow_fx_config';
 
 // Must match the particle pool / GPU buffer capacity (MAX_PARTICLES in
@@ -48,20 +46,19 @@ export const TOOL_FX_SCHEMA = {
   repulsor: TOOL_FX_PARAM_TEMPLATE,
 };
 
+// Tuned and shared by the user via the panel's "Werte kopieren" button.
 const MAIN_DEFAULTS = {
-  color_scheme: DEFAULT_SCHEME,
-  custom_gradient: [...DEFAULT_CUSTOM_STOPS],
-  particle_count: MAX_MAIN_PARTICLES,
-  point_size: 3,
-  max_speed_for_color: 0.5,
+  color_scheme: 'custom',
+  custom_gradient: ['#0095ff', '#6600ff', '#ee00ff'],
+  particle_count: 4000,
+  point_size: 8,
+  max_speed_for_color: 0.6,
 };
 
-// Trail length defaults are short on purpose (dots, not lines) — the
-// player can lengthen them into streaks/comets via the panel.
 const TOOL_FX_DEFAULTS = {
-  wind_jet: { count: 50, speed: 1, length: 6, gradient: 'neon', custom_gradient: [...DEFAULT_CUSTOM_STOPS], line_width: 1 },
-  attractor: { count: 70, speed: 1, length: 6, gradient: 'ember', custom_gradient: [...DEFAULT_CUSTOM_STOPS], line_width: 1 },
-  repulsor: { count: 70, speed: 1, length: 6, gradient: 'sunset', custom_gradient: [...DEFAULT_CUSTOM_STOPS], line_width: 1 },
+  wind_jet: { count: 150, speed: 0.5, length: 5, gradient: 'custom', custom_gradient: ['#0095ff', '#5900ff', '#3d0099'], line_width: 1.2 },
+  attractor: { count: 70, speed: 0.4, length: 10, gradient: 'custom', custom_gradient: ['#ff0000', '#ffa200', '#ffae00'], line_width: 1 },
+  repulsor: { count: 55, speed: 0.4, length: 20, gradient: 'custom', custom_gradient: ['#2efcff', '#00ff6e', '#1eff00'], line_width: 1 },
 };
 
 function defaultConfig() {

@@ -6,7 +6,7 @@
 // tool's own ambient particle flow (its visual "character") is owned by
 // toolFx.js and drawn between the boundary and the center glow.
 
-import { TOOL_DEFINITIONS, WIND_JET_RANGE, windJetStrengthToHandleLenCss } from './tools.js';
+import { TOOL_DEFINITIONS, windJetStrengthToHandleLenCss, windJetEffectiveRange } from './tools.js';
 import { toPixel, toPixelLength, cssToDevicePixel, getSize } from './coords.js';
 import { drawObstacles } from './obstacles.js';
 import { getHandlePositionsCss } from './handles.js';
@@ -380,13 +380,13 @@ export class UI {
   _drawWindJetBoundary(ctx, tool, p, dpr, isSelected, isInvalid) {
     if (!isSelected && !isInvalid) return; // reach wedge/core beam only shown while selected
 
-    const range = toPixelLength(WIND_JET_RANGE);
+    const range = toPixelLength(windJetEffectiveRange(tool.strength));
     const dirRad = (tool.params.direction || 0) * Math.PI / 180;
     const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
     const invalidTint = isInvalid ? 'rgba(239, 68, 68, 0.9)' : null;
 
-    // Faint reach wedge for context — the cone's range is fixed, not
-    // user-tunable; only length (strength) and angle (direction) are.
+    // Faint reach wedge for context — scales with the vector handle's
+    // length (strength), same as the actual force cone in tools.js.
     ctx.strokeStyle = invalidTint || 'rgba(147, 197, 253, 0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath();
