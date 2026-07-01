@@ -5,9 +5,14 @@
 import { speedToColor } from './colorSchemes.js';
 
 export function initGL(canvas) {
-  const gl = canvas.getContext('webgl', { alpha: false, antialias: true, premultipliedAlpha: false });
+  // alpha: true + a fully transparent clear — this canvas sits *above*
+  // toolfx-canvas in the stack (see CLAUDE.md/css layering note), so it
+  // must let that layer show through wherever no particle is drawn. The
+  // overall dark backdrop comes from the page background (#0A0C10) now,
+  // not from this clear color.
+  const gl = canvas.getContext('webgl', { alpha: true, antialias: true, premultipliedAlpha: false });
   if (!gl) throw new Error('WebGL nicht verfügbar');
-  gl.clearColor(10 / 255, 12 / 255, 16 / 255, 1);
+  gl.clearColor(0, 0, 0, 0);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // additive glow
   return gl;
