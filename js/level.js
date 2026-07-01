@@ -102,11 +102,14 @@ export class Level {
     const completion = this.def.completion;
     const targets = this.def.targets;
     const requiredIds = completion.targets_required;
+    // Multi-emitter levels (e.g. "Zwei Quellen") measure efficiency against
+    // the combined output of every emitter, not a single emitter's rate.
+    const totalEmitterRate = this.def.emitter_rate * this.def.emitters.length;
 
     let allHeld = true;
     for (let t = 0; t < targets.length; t++) {
       this.throughputMonitors[t].prune(now);
-      const efficiency = this.throughputMonitors[t].getEfficiency(this.def.emitter_rate);
+      const efficiency = this.throughputMonitors[t].getEfficiency(totalEmitterRate);
       this.lastEfficiencies[t] = efficiency;
       if (requiredIds.includes(targets[t].id) && efficiency < completion.efficiency_threshold) {
         allHeld = false;

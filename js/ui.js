@@ -50,9 +50,19 @@ export class UI {
     this.fxPanelContentEl = document.getElementById('fx-panel-content');
     this.settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
+      this.levelSelectPanelEl.classList.add('hidden');
       this.settingsPanelEl.classList.toggle('hidden');
     });
     this.buildFxPanel();
+
+    this.levelSelectBtn = document.getElementById('level-select-btn');
+    this.levelSelectPanelEl = document.getElementById('level-select-panel');
+    this.levelSelectContentEl = document.getElementById('level-select-content');
+    this.levelSelectBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.settingsPanelEl.classList.add('hidden');
+      this.levelSelectPanelEl.classList.toggle('hidden');
+    });
 
     // Clicking outside the canvas (HUD/palette) clears the selection;
     // clicks on the field itself are already handled by dragController's
@@ -67,6 +77,13 @@ export class UI {
         e.target !== this.settingsBtn
       ) {
         this.settingsPanelEl.classList.add('hidden');
+      }
+      if (
+        !this.levelSelectPanelEl.classList.contains('hidden') &&
+        !this.levelSelectPanelEl.contains(e.target) &&
+        e.target !== this.levelSelectBtn
+      ) {
+        this.levelSelectPanelEl.classList.add('hidden');
       }
     });
 
@@ -248,6 +265,50 @@ export class UI {
       }, 1500);
     });
     return btn;
+  }
+
+  // Lets the player jump directly to any already-reached level. A level
+  // is reachable once the one before it has been completed (or it's
+  // level 1, or it's already been completed itself — replayable). Levels
+  // beyond that stay locked, same progression rule the tool-unlock system
+  // already follows.
+  buildLevelSelectPanel(levelData, save, currentLevelId, onSelect) {
+    const container = this.levelSelectContentEl;
+    container.innerHTML = '';
+    const maxReachableId = save.completed_levels.length ? Math.max(...save.completed_levels) + 1 : 1;
+
+    levelData.forEach((def, index) => {
+      const completed = save.completed_levels.includes(def.id);
+      const reachable = def.id <= maxReachableId;
+      const isActive = def.id === currentLevelId;
+
+      const row = document.createElement('div');
+      row.className = 'level-row' + (isActive ? ' active' : '') + (completed ? ' completed' : '') + (reachable ? '' : ' locked');
+
+      const num = document.createElement('span');
+      num.className = 'level-row-num';
+      num.textContent = completed ? '✓' : String(def.id);
+      row.appendChild(num);
+
+      const name = document.createElement('span');
+      name.className = 'level-row-name';
+      name.textContent = `${def.id}. ${def.name}`;
+      row.appendChild(name);
+
+      if (!reachable) {
+        const lock = document.createElement('span');
+        lock.className = 'level-row-lock';
+        lock.textContent = '🔒';
+        row.appendChild(lock);
+      } else {
+        row.addEventListener('click', () => {
+          this.levelSelectPanelEl.classList.add('hidden');
+          onSelect(index);
+        });
+      }
+
+      container.appendChild(row);
+    });
   }
 
   // Consistent layout for every tool (glyph + label + cost, same sizing

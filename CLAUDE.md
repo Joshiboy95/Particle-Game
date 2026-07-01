@@ -81,8 +81,12 @@ budget.
   cost/unlock data — nothing else in the pipeline changes.
 - Game state (progress, unlocked tools) persists to `localStorage` under
   `particle_flow_save` (schema per doc §9.4).
-- POC scope: 3 levels (free flow, wall, L-obstacle), 3 tools (Wind-Jet,
-  Attraktor, Repulsor).
+- POC scope: 7 levels in `js/data/levels.js` (all buildable with the 3
+  implemented tools — ambient force and multi-emitter levels included;
+  the design doc's levels needing Vortex/Deflector/Portal-Paar aren't
+  built yet), 3 tools (Wind-Jet, Attraktor, Repulsor). A level-select
+  panel (`☰` button, top-right) lets the player jump to any level whose
+  predecessor is completed — same sequential-unlock rule as tools.
 
 See `C:\Users\rosen\.claude\plans\frolicking-seeking-sky.md` for the full
 file-by-file POC implementation plan (module responsibilities, per-frame

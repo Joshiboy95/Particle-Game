@@ -45,6 +45,7 @@ function startLevel(index) {
   handledComplete = false;
   save.current_level = level.def.id;
   ui.buildPalette(level, save.unlocked_tools);
+  ui.buildLevelSelectPanel(LEVEL_DATA, save, level.def.id, startLevel);
   ui.showLevelModal(level.def, levelIndex + 1, LEVEL_DATA.length);
 }
 
@@ -68,6 +69,7 @@ function frame(now) {
     handledComplete = true;
     markLevelComplete(save, level.def.id, level.def.unlocks_on_complete);
     ui.buildPalette(level, save.unlocked_tools);
+    ui.buildLevelSelectPanel(LEVEL_DATA, save, level.def.id, startLevel);
     ui.showCompleteModal(goToNextLevel);
   }
 

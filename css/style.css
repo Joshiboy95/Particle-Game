@@ -105,8 +105,7 @@ html, body {
   white-space: nowrap;
 }
 
-#settings-btn {
-  margin-left: auto;
+#level-select-btn, #settings-btn {
   width: 32px;
   height: 32px;
   flex: 0 0 auto;
@@ -120,11 +119,15 @@ html, body {
   pointer-events: auto;
 }
 
-#settings-btn:hover {
+#level-select-btn {
+  margin-left: auto;
+}
+
+#level-select-btn:hover, #settings-btn:hover {
   border-color: #3B82F6;
 }
 
-/* --- Settings panel --- */
+/* --- Settings / level-select panels --- */
 
 .panel {
   position: absolute;
@@ -138,6 +141,10 @@ html, body {
   border-radius: 10px;
   padding: 12px;
   z-index: 20;
+}
+
+#level-select-panel {
+  right: 76px;
 }
 
 .panel.hidden {
@@ -276,6 +283,73 @@ html, body {
 
 .scheme-row.active .scheme-label {
   color: #E8ECF4;
+}
+
+/* --- Level select --- */
+
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid #2A3040;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+
+.level-row:last-child {
+  margin-bottom: 0;
+}
+
+.level-row:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.level-row.active {
+  border-color: #3B82F6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.level-row.locked {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.level-row-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  background: #1E2230;
+  border: 1px solid #2A3040;
+  color: #8A93A8;
+}
+
+.level-row.completed .level-row-num {
+  background: rgba(74, 222, 128, 0.15);
+  border-color: rgba(74, 222, 128, 0.5);
+  color: #4ADE80;
+}
+
+.level-row-name {
+  font-size: 12px;
+  color: #C4CBDA;
+  flex: 1;
+}
+
+.level-row.active .level-row-name {
+  color: #E8ECF4;
+}
+
+.level-row-lock {
+  font-size: 10px;
+  color: #8A93A8;
 }
 
 .custom-stops-row {
