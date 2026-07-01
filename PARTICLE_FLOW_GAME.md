@@ -571,6 +571,16 @@ particle-flow.html
     └── LEVEL_DATA (alle Level-Definitionen)
 ```
 
+> **Implementierungs-Hinweis (POC, nicht normativ):** Die tatsächliche
+> POC-Umsetzung weicht von diesem Abschnitt ab: mehrere statische Dateien
+> (HTML/CSS/JS als ES-Module) statt einer einzelnen HTML-Datei, und
+> CPU-seitige JS-Physik (Typed Arrays) statt GPGPU-Ping-Pong-Texturen, da
+> die tatsächlichen Partikelzahlen dieses Spiels dafür zu klein sind (siehe
+> `CLAUDE.md`). Einzige harte Anforderung bleibt: kein Build-Schritt, kein
+> Server-Runtime — lauffähig von jedem statischen Webserver. Der Rest
+> dieses Abschnitts (Modul-Aufteilung, Datenfluss) beschreibt weiterhin
+> sinnvoll die logische Architektur, nur eben über mehrere Dateien verteilt.
+
 ---
 
 ## 9. Datenschemas
@@ -736,11 +746,15 @@ Da Level reines JSON sind, ist ein prozeduraler Generator möglich:
 
 ### Ziel des POC
 
-Ein funktionierendes, spielbares Proof-of-Concept in einer einzelnen HTML-Datei mit 3 Leveln, das die vollständige Spielarchitektur bereits sauber abbildet.
+Ein funktionierendes, spielbares Proof-of-Concept mit 3 Leveln, das die vollständige Spielarchitektur bereits sauber abbildet.
+
+> **Implementierungs-Hinweis (POC, nicht normativ):** siehe §8.7 — die
+> tatsächliche Umsetzung nutzt mehrere statische Dateien und CPU-seitige
+> JS-Physik statt einer einzelnen HTML-Datei mit GPGPU-Textur-Ping-Pong.
 
 ### Enthaltene Features
 
-- GPGPU Partikel-Simulation (WebGL2, Ping-Pong Texturen)
+- CPU-seitige Partikel-Simulation (Typed Arrays), WebGL1 nur fürs Rendering
 - 3 Level (L1: frei, L2: Mauer, L3: L-Hindernis)
 - 3 Tools: Wind-Jet, Attraktor, Repulsor
 - Drag-and-Place Tool-Platzierung
@@ -764,10 +778,11 @@ Ein funktionierendes, spielbares Proof-of-Concept in einer einzelnen HTML-Datei 
 
 ### Technische Zielgröße
 
-- 256x256 GPGPU-Textur (65.536 Partikel)
+- Typed-Array-Partikelpool, dimensioniert für deutlich mehr als die im
+  POC tatsächlich benötigten ~2.000 gleichzeitig aktiven Partikel
 - 200 Partikel/Sekunde Emitter-Rate
 - 60 FPS auf Mittelklasse-Hardware (GTX 1070 oder vergleichbar)
-- Maximale Dateigröße: ~1 MB (keine externen Abhängigkeiten)
+- Keine externen Abhängigkeiten, kein Build-Schritt
 
 ---
 

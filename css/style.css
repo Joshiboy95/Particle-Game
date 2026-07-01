@@ -1,0 +1,224 @@
+@font-face {
+  font-family: 'Figtree';
+  src: local('Figtree');
+  font-weight: 400 700;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background: #0A0C10;
+  color: #E8ECF4;
+  font-family: 'Figtree', system-ui, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#game-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+#gl-canvas, #ui-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#ui-canvas {
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* --- HUD --- */
+
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px;
+  background: linear-gradient(to bottom, rgba(10,12,16,0.85), transparent);
+  pointer-events: none;
+}
+
+#level-label {
+  font-size: 14px;
+  color: #8A93A8;
+  white-space: nowrap;
+}
+
+#budget-bar {
+  position: relative;
+  flex: 1;
+  max-width: 320px;
+  height: 18px;
+  background: #1E2230;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid #2A3040;
+}
+
+#budget-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(to right, #3B82F6, #60A5FA);
+  transition: width 0.2s ease;
+}
+
+#budget-bar-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #E8ECF4;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+}
+
+#throughput-readout {
+  font-size: 13px;
+  color: #60A5FA;
+  white-space: nowrap;
+}
+
+/* --- Tool palette --- */
+
+#toolpalette {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  background: linear-gradient(to top, rgba(10,12,16,0.9), transparent);
+}
+
+.tool-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  background: #1E2230;
+  border: 1px solid #2A3040;
+  border-radius: 10px;
+  cursor: grab;
+  touch-action: none;
+  color: #E8ECF4;
+}
+
+.tool-icon .tool-cost {
+  font-size: 11px;
+  color: #60A5FA;
+  margin-top: 2px;
+}
+
+.tool-icon.locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.tool-icon.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tool-icon .tool-lock-label {
+  font-size: 9px;
+  color: #8A93A8;
+}
+
+/* --- Modals --- */
+
+.modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10,12,16,0.7);
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-box {
+  background: #14161C;
+  border: 1px solid #2A3040;
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 420px;
+  text-align: center;
+}
+
+.modal-box h2 {
+  margin: 0 0 12px;
+  font-weight: 600;
+}
+
+.modal-box button {
+  margin-top: 16px;
+  padding: 8px 20px;
+  background: #3B82F6;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+/* --- Tool properties popover --- */
+
+.popover {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #14161C;
+  border: 1px solid #2A3040;
+  border-radius: 8px;
+  font-size: 12px;
+  z-index: 10;
+}
+
+.popover.hidden {
+  display: none;
+}
+
+.popover label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.popover button {
+  margin-top: 4px;
+  padding: 4px 8px;
+  background: #B91C1C;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-family: inherit;
+  cursor: pointer;
+}

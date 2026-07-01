@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Particle Flow</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="game-root">
+    <canvas id="gl-canvas"></canvas>
+    <canvas id="ui-canvas"></canvas>
+
+    <div id="hud">
+      <div id="level-label">Level 1 von 3</div>
+      <div id="budget-bar">
+        <div id="budget-bar-fill"></div>
+        <span id="budget-bar-text">0 / 0 EP</span>
+      </div>
+      <div id="throughput-readout">0%</div>
+    </div>
+
+    <div id="toolpalette"></div>
+
+    <div id="level-modal" class="modal hidden">
+      <div class="modal-box">
+        <h2 id="level-modal-title"></h2>
+        <p id="level-modal-desc"></p>
+      </div>
+    </div>
+
+    <div id="complete-modal" class="modal hidden">
+      <div class="modal-box">
+        <h2>Level abgeschlossen</h2>
+        <button id="next-level-btn">Nächstes Level</button>
+      </div>
+    </div>
+
+    <div id="tool-popover" class="popover hidden">
+      <label>Stärke <input id="popover-strength" type="range" min="0" max="1" step="0.01"></label>
+      <label>Radius <input id="popover-radius" type="range" min="0" max="1" step="0.01"></label>
+      <button id="popover-remove">Entfernen</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
