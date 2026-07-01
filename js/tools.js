@@ -12,7 +12,7 @@
 // element. Attractor/Repulsor expose a single visual "power" handle on
 // the ring edge; radius and strength both derive from where that handle
 // sits, so there's effectively one on-canvas control.
-export const WIND_JET_RANGE = 0.45;
+export const WIND_JET_RANGE = 0.2;
 export const WIND_JET_MIN_STRENGTH = 0.15;
 export const WIND_JET_MAX_STRENGTH = 0.9; // also the particle speed cap at full extension
 export const WIND_JET_MIN_LEN_CSS = 30;
