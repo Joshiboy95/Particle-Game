@@ -18,12 +18,15 @@ import {
   windJetHandleLenCssToStrength,
   WIND_JET_MIN_LEN_CSS,
   WIND_JET_MAX_LEN_CSS,
+  WIND_JET_RANGE,
   RADIAL_MIN_RADIUS,
   RADIAL_MAX_RADIUS,
   radialStrengthFromRadius,
+  normalizeAngle,
 } from './tools.js';
 
-const HIT_RADIUS_NORM = 0.035; // click/tap tolerance for picking up a placed tool
+const HIT_RADIUS_NORM = 0.035; // minimum click/tap tolerance even for a tiny tool
+const WIND_JET_HIT_ANGLE_MARGIN = (8 * Math.PI) / 180; // a bit forgiving past the cone's visual edge
 const TAP_MOVE_THRESHOLD_NORM = 0.01; // below this, a press+release counts as a tap, not a drag
 
 function clamp(v, min, max) {
@@ -236,14 +239,30 @@ export class DragController {
     return tool ? tool.position : null;
   }
 
+  // The whole visual footprint is clickable (the cone for Wind-Jet, the
+  // whole ring for Attractor/Repulsor) — not just a small dot at the
+  // center — with a small fixed floor so even a tiny tool stays pickable.
+  _isInsideFootprint(tool, norm, dist) {
+    if (dist < HIT_RADIUS_NORM) return true;
+    if (tool.type === 'wind_jet') {
+      if (dist > WIND_JET_RANGE) return false;
+      const dirRad = (tool.params.direction || 0) * Math.PI / 180;
+      const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
+      const angleToPoint = Math.atan2(norm.y - tool.position.y, norm.x - tool.position.x);
+      const diff = normalizeAngle(angleToPoint - dirRad);
+      return Math.abs(diff) <= spreadRad / 2 + WIND_JET_HIT_ANGLE_MARGIN;
+    }
+    return dist <= tool.radius;
+  }
+
   _findToolNear(level, norm) {
     let best = null;
-    let bestDist = HIT_RADIUS_NORM;
+    let bestDist = Infinity;
     for (const tool of level.activeTools) {
       const dx = tool.position.x - norm.x;
       const dy = tool.position.y - norm.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < bestDist) {
+      if (this._isInsideFootprint(tool, norm, dist) && dist < bestDist) {
         best = tool;
         bestDist = dist;
       }

@@ -12,8 +12,8 @@
 export const WIND_JET_RANGE = 0.28;
 export const WIND_JET_MIN_STRENGTH = 0.15;
 export const WIND_JET_MAX_STRENGTH = 0.9;
-export const WIND_JET_MIN_LEN_CSS = 24;
-export const WIND_JET_MAX_LEN_CSS = 160;
+export const WIND_JET_MIN_LEN_CSS = 30;
+export const WIND_JET_MAX_LEN_CSS = 300; // long drag range for granular strength control
 
 export const RADIAL_MIN_RADIUS = 0.05;
 export const RADIAL_MAX_RADIUS = 0.32;
@@ -71,7 +71,7 @@ export const TOOL_DEFINITIONS = {
 
 const SOFTENING = 0.02; // prevents force spike / division blowup near tool center
 
-function normalizeAngle(a) {
+export function normalizeAngle(a) {
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
   return a;

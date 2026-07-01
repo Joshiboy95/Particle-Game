@@ -1,23 +1,26 @@
 // DOM UI (palette, budget bar, modals) + Canvas2D overlay rendering
 // (obstacles come from obstacles.js; this module draws the emitter,
-// target circle, tool force-field visuals, and the drag ghost). There is
+// target circle, tool boundaries/handles, and the drag ghost). There is
 // no properties panel — every tool parameter is edited by dragging
-// directly on the element via its handles (see handles.js/drag.js).
+// directly on the element via its handles (see handles.js/drag.js). Each
+// tool's own ambient particle flow (its visual "character") is owned by
+// toolFx.js and drawn between the boundary and the center glow.
 
 import { TOOL_DEFINITIONS, WIND_JET_RANGE, windJetStrengthToHandleLenCss } from './tools.js';
 import { toPixel, toPixelLength, cssToDevicePixel, getSize } from './coords.js';
 import { drawObstacles } from './obstacles.js';
 import { getHandlePositionsCss } from './handles.js';
+import { ToolFxManager } from './toolFx.js';
 
 const TOOL_ORDER = ['wind_jet', 'attractor', 'repulsor'];
 const FILL_SMOOTHING_SECONDS = 1.0;
-const RADIAL_SPOKE_COUNT = 14;
 
 export class UI {
   constructor({ uiCanvas, dragController }) {
     this.uiCanvas = uiCanvas;
     this.ctx = uiCanvas.getContext('2d');
     this.dragController = dragController;
+    this.toolFx = new ToolFxManager();
 
     this.paletteEl = document.getElementById('toolpalette');
     this.levelLabelEl = document.getElementById('level-label');
@@ -100,11 +103,17 @@ export class UI {
   render(level, dt) {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
+    const dpr = getSize().dpr;
 
     drawObstacles(ctx, level.def.obstacles);
     this._drawEmitters(ctx, level.def.emitters);
     this._drawTargets(ctx, level, dt);
-    this._drawTools(ctx, level);
+
+    this.toolFx.step(level.activeTools, dt);
+    this._drawToolBoundaries(ctx, level, dpr);
+    this.toolFx.draw(ctx, level.activeTools, dpr);
+    this._drawToolCenters(ctx, level, dpr);
+
     this._drawDragGhost(ctx, level);
     this._drawSelectionHandles(ctx, level);
   }
@@ -154,25 +163,28 @@ export class UI {
     }
   }
 
-  _drawTools(ctx, level) {
+  _isDraggedInvalid(tool) {
+    return (
+      this.dragController.state === 'dragging-existing' &&
+      this.dragController.draggedToolId === tool.id &&
+      !this.dragController.dragValid
+    );
+  }
+
+  _drawToolBoundaries(ctx, level, dpr) {
     for (const tool of level.activeTools) {
       const p = toPixel(tool.position.x, tool.position.y);
-      const isDraggedInvalid =
-        this.dragController.state === 'dragging-existing' &&
-        this.dragController.draggedToolId === tool.id &&
-        !this.dragController.dragValid;
       const isSelected = this.dragController.selectedToolId === tool.id;
-
+      const isInvalid = this._isDraggedInvalid(tool);
       if (tool.type === 'wind_jet') {
-        this._drawWindJet(ctx, tool, p, isSelected, isDraggedInvalid);
+        this._drawWindJetBoundary(ctx, tool, p, dpr, isSelected, isInvalid);
       } else {
-        this._drawRadial(ctx, tool, p, tool.type === 'repulsor', isSelected, isDraggedInvalid);
+        this._drawRadialBoundary(ctx, tool, p, dpr, isSelected, isInvalid);
       }
     }
   }
 
-  _drawWindJet(ctx, tool, p, isSelected, isInvalid) {
-    const dpr = getSize().dpr;
+  _drawWindJetBoundary(ctx, tool, p, dpr, isSelected, isInvalid) {
     const range = toPixelLength(WIND_JET_RANGE);
     const dirRad = (tool.params.direction || 0) * Math.PI / 180;
     const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
@@ -188,44 +200,19 @@ export class UI {
     ctx.closePath();
     ctx.stroke();
 
-    // Main force vector: its length *is* the strength.
-    const lenCss = windJetStrengthToHandleLenCss(tool.strength);
-    const len = lenCss * dpr;
+    // Persistent core beam: always visible (not just when selected) so
+    // the current strength/direction reads at a glance; its length *is*
+    // the strength.
+    const len = windJetStrengthToHandleLenCss(tool.strength) * dpr;
     const tipX = p.x + Math.cos(dirRad) * len;
     const tipY = p.y + Math.sin(dirRad) * len;
-
-    this._drawGradientRay(ctx, p.x, p.y, tipX, tipY, invalidTint, 2.5 * dpr);
-    this._drawArrowhead(ctx, tipX, tipY, dirRad, invalidTint || '#BFDBFE', 6 * dpr);
-
-    // Flanking flow lines for texture.
-    for (const offset of [-0.14, 0.14]) {
-      const a = dirRad + offset;
-      const flen = len * 0.65;
-      const fx = p.x + Math.cos(a) * flen;
-      const fy = p.y + Math.sin(a) * flen;
-      this._drawGradientRay(ctx, p.x, p.y, fx, fy, invalidTint, 1 * dpr, 0.5);
-    }
-
-    ctx.fillStyle = invalidTint || '#93C5FD';
+    ctx.strokeStyle = invalidTint || 'rgba(191, 219, 254, 0.45)';
+    ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  _drawGradientRay(ctx, x1, y1, x2, y2, tintOverride, lineWidth, alphaScale = 1) {
-    if (tintOverride) {
-      ctx.strokeStyle = tintOverride;
-    } else {
-      const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-      gradient.addColorStop(0, `rgba(191, 219, 254, ${0.95 * alphaScale})`);
-      gradient.addColorStop(1, `rgba(96, 165, 250, ${0.1 * alphaScale})`);
-      ctx.strokeStyle = gradient;
-    }
-    ctx.lineWidth = lineWidth;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(tipX, tipY);
     ctx.stroke();
+    this._drawArrowhead(ctx, tipX, tipY, dirRad, invalidTint || 'rgba(191, 219, 254, 0.6)', 5 * dpr);
   }
 
   _drawArrowhead(ctx, tipX, tipY, angle, color, size) {
@@ -238,62 +225,38 @@ export class UI {
     ctx.fill();
   }
 
-  // Attractor/Repulsor: radiating "light" spokes from the center, each
-  // with its own gradient (bright-near-center for attractor, pulling the
-  // eye inward; bright-near-edge for repulsor, pushing it outward), plus
-  // a small arrow along each spoke showing the force's direction.
-  _drawRadial(ctx, tool, p, outward, isSelected, isInvalid) {
-    const dpr = getSize().dpr;
+  _drawRadialBoundary(ctx, tool, p, dpr, isSelected, isInvalid) {
     const r = toPixelLength(tool.radius);
-    const invalidTint = isInvalid ? 'rgba(239, 68, 68, 0.85)' : null;
+    ctx.strokeStyle = isInvalid
+      ? 'rgba(239, 68, 68, 0.85)'
+      : isSelected
+      ? 'rgba(147, 197, 253, 0.4)'
+      : 'rgba(147, 197, 253, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
-    for (let i = 0; i < RADIAL_SPOKE_COUNT; i++) {
-      const angle = (i / RADIAL_SPOKE_COUNT) * Math.PI * 2;
-      const x2 = p.x + Math.cos(angle) * r;
-      const y2 = p.y + Math.sin(angle) * r;
+  _drawToolCenters(ctx, level, dpr) {
+    for (const tool of level.activeTools) {
+      const p = toPixel(tool.position.x, tool.position.y);
+      const isInvalid = this._isDraggedInvalid(tool);
+      const glowR = tool.type === 'wind_jet' ? 10 * dpr : Math.max(6 * dpr, toPixelLength(tool.radius) * 0.16);
 
-      if (invalidTint) {
-        ctx.strokeStyle = invalidTint;
-      } else {
-        const gradient = ctx.createLinearGradient(p.x, p.y, x2, y2);
-        const innerAlpha = isSelected ? 0.95 : 0.8;
-        const outerAlpha = isSelected ? 0.12 : 0.06;
-        if (outward) {
-          gradient.addColorStop(0, `rgba(147, 197, 253, ${outerAlpha})`);
-          gradient.addColorStop(1, `rgba(191, 219, 254, ${innerAlpha})`);
-        } else {
-          gradient.addColorStop(0, `rgba(191, 219, 254, ${innerAlpha})`);
-          gradient.addColorStop(1, `rgba(147, 197, 253, ${outerAlpha})`);
-        }
-        ctx.strokeStyle = gradient;
-      }
-      ctx.lineWidth = 1.25 * dpr;
+      const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowR);
+      glow.addColorStop(0, isInvalid ? 'rgba(239, 68, 68, 0.7)' : 'rgba(191, 219, 254, 0.65)');
+      glow.addColorStop(1, 'rgba(191, 219, 254, 0)');
+      ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
+      ctx.arc(p.x, p.y, glowR, 0, Math.PI * 2);
+      ctx.fill();
 
-      // Small chevron marking the force's direction along the spoke.
-      const chevronDist = outward ? r * 0.72 : r * 0.4;
-      const cx = p.x + Math.cos(angle) * chevronDist;
-      const cy = p.y + Math.sin(angle) * chevronDist;
-      const chevronAngle = outward ? angle : angle + Math.PI;
-      this._drawArrowhead(ctx, cx, cy, chevronAngle, invalidTint || 'rgba(191, 219, 254, 0.7)', 4 * dpr);
+      ctx.fillStyle = isInvalid ? 'rgba(239, 68, 68, 0.9)' : '#93C5FD';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
+      ctx.fill();
     }
-
-    // Soft glow disc at the center.
-    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 0.18);
-    glow.addColorStop(0, invalidTint || 'rgba(191, 219, 254, 0.6)');
-    glow.addColorStop(1, 'rgba(191, 219, 254, 0)');
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, r * 0.18, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = invalidTint || '#93C5FD';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   _drawDragGhost(ctx, level) {
