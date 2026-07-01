@@ -11,6 +11,7 @@ import { toPixel, toPixelLength, cssToDevicePixel, getSize } from './coords.js';
 import { drawObstacles } from './obstacles.js';
 import { getHandlePositionsCss } from './handles.js';
 import { ToolFxManager } from './toolFx.js';
+import { SCHEME_META } from './colorSchemes.js';
 
 const TOOL_ORDER = ['wind_jet', 'attractor', 'repulsor'];
 const FILL_SMOOTHING_SECONDS = 1.0;
@@ -34,6 +35,14 @@ export class UI {
     this.completeModalEl = document.getElementById('complete-modal');
     this.nextLevelBtn = document.getElementById('next-level-btn');
 
+    this.settingsBtn = document.getElementById('settings-btn');
+    this.settingsPanelEl = document.getElementById('settings-panel');
+    this.schemeListEl = document.getElementById('scheme-list');
+    this.settingsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.settingsPanelEl.classList.toggle('hidden');
+    });
+
     // Clicking outside the canvas (HUD/palette) clears the selection;
     // clicks on the field itself are already handled by dragController's
     // own empty-space/handle/tool hit-testing in _onCanvasDown.
@@ -41,11 +50,36 @@ export class UI {
       if (this.dragController.state === 'idle' && e.target !== this.uiCanvas) {
         this.dragController.deselect();
       }
+      if (
+        !this.settingsPanelEl.classList.contains('hidden') &&
+        !this.settingsPanelEl.contains(e.target) &&
+        e.target !== this.settingsBtn
+      ) {
+        this.settingsPanelEl.classList.add('hidden');
+      }
     });
 
     this._smoothedFill = [];
     this._lastBudgetText = '';
     this._levelModalTimer = null;
+  }
+
+  buildSchemePanel(activeKey, onSelect) {
+    this.schemeListEl.innerHTML = '';
+    for (const meta of SCHEME_META) {
+      const row = document.createElement('div');
+      row.className = 'scheme-row' + (meta.key === activeKey ? ' active' : '');
+      row.innerHTML =
+        '<span class="scheme-dot"></span>' +
+        `<span class="scheme-swatch" style="background:${meta.preview}"></span>` +
+        `<span class="scheme-label">${meta.label}</span>`;
+      row.addEventListener('click', () => {
+        this.schemeListEl.querySelectorAll('.scheme-row').forEach((r) => r.classList.remove('active'));
+        row.classList.add('active');
+        onSelect(meta.key);
+      });
+      this.schemeListEl.appendChild(row);
+    }
   }
 
   buildPalette(level, unlockedTools) {

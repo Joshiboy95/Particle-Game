@@ -2,6 +2,8 @@
 // This is the only thing drawn on the GL canvas — everything else (UI,
 // obstacles, tool visuals) is drawn on the Canvas2D overlay in ui.js.
 
+import { speedToColor } from './colorSchemes.js';
+
 export function initGL(canvas) {
   const gl = canvas.getContext('webgl', { alpha: false, antialias: true, premultipliedAlpha: false });
   if (!gl) throw new Error('WebGL nicht verfügbar');
@@ -40,31 +42,31 @@ function createProgram(gl, vsSource, fsSource) {
 
 const VS = `
   attribute vec2 a_pos;   // normalized 0..1, y-down
-  attribute float a_alpha;
+  attribute vec4 a_color; // rgb + alpha
   uniform float u_pointSize;
-  varying float v_alpha;
+  varying vec4 v_color;
   void main() {
     vec2 clip = vec2(a_pos.x * 2.0 - 1.0, 1.0 - a_pos.y * 2.0);
     gl_Position = vec4(clip, 0.0, 1.0);
     gl_PointSize = u_pointSize;
-    v_alpha = a_alpha;
+    v_color = a_color;
   }
 `;
 
 const FS = `
   precision mediump float;
-  varying float v_alpha;
+  varying vec4 v_color;
   void main() {
     vec2 d = gl_PointCoord - vec2(0.5);
     float dist = length(d);
     if (dist > 0.5) discard;
     float glow = smoothstep(0.5, 0.0, dist);
-    gl_FragColor = vec4(0.75, 0.85, 1.0, glow * v_alpha);
+    gl_FragColor = vec4(v_color.rgb, glow * v_color.a);
   }
 `;
 
-// floats per vertex: x, y, alpha
-const STRIDE_FLOATS = 3;
+// floats per vertex: x, y, r, g, b, alpha
+const STRIDE_FLOATS = 6;
 
 export class ParticleRenderer {
   constructor(gl, maxParticles) {
@@ -76,27 +78,36 @@ export class ParticleRenderer {
     gl.bufferData(gl.ARRAY_BUFFER, maxParticles * STRIDE_FLOATS * 4, gl.DYNAMIC_DRAW);
 
     this.a_pos = gl.getAttribLocation(this.program, 'a_pos');
-    this.a_alpha = gl.getAttribLocation(this.program, 'a_alpha');
+    this.a_color = gl.getAttribLocation(this.program, 'a_color');
     this.u_pointSize = gl.getUniformLocation(this.program, 'u_pointSize');
 
     this.scratch = new Float32Array(maxParticles * STRIDE_FLOATS);
   }
 
-  // pool: a particles.js ParticlePool (SoA: px, py, age, maxAge, count).
-  // Reads straight from its typed arrays — no per-particle object churn.
-  draw(pool, dpr) {
+  // pool: a particles.js ParticlePool (SoA: px, py, vx, vy, age, maxAge,
+  // count). Reads straight from its typed arrays — no per-particle object
+  // churn. colorScheme: a colorSchemes.js scheme key.
+  draw(pool, dpr, colorScheme) {
     const gl = this.gl;
     const n = Math.min(pool.count, this.maxParticles);
     const data = this.scratch;
-    const { px, py, age, maxAge } = pool;
+    const { px, py, vx, vy, age, maxAge } = pool;
     for (let i = 0; i < n; i++) {
-      data[i * STRIDE_FLOATS] = px[i];
-      data[i * STRIDE_FLOATS + 1] = py[i];
+      const base = i * STRIDE_FLOATS;
+      data[base] = px[i];
+      data[base + 1] = py[i];
+
+      const speed = Math.hypot(vx[i], vy[i]);
+      const [r, g, b] = speedToColor(colorScheme, speed);
+      data[base + 2] = r;
+      data[base + 3] = g;
+      data[base + 4] = b;
+
       // fade in briefly at birth, fade out over the last 20% of lifetime
       const lifeFrac = age[i] / maxAge[i];
       const fadeIn = Math.min(1, age[i] / 0.2);
       const fadeOut = Math.min(1, (1 - lifeFrac) / 0.2);
-      data[i * STRIDE_FLOATS + 2] = Math.max(0, Math.min(fadeIn, fadeOut));
+      data[base + 5] = Math.max(0, Math.min(fadeIn, fadeOut));
     }
 
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -109,8 +120,8 @@ export class ParticleRenderer {
     const stride = STRIDE_FLOATS * 4;
     gl.enableVertexAttribArray(this.a_pos);
     gl.vertexAttribPointer(this.a_pos, 2, gl.FLOAT, false, stride, 0);
-    gl.enableVertexAttribArray(this.a_alpha);
-    gl.vertexAttribPointer(this.a_alpha, 1, gl.FLOAT, false, stride, 8);
+    gl.enableVertexAttribArray(this.a_color);
+    gl.vertexAttribPointer(this.a_color, 4, gl.FLOAT, false, stride, 8);
 
     gl.uniform1f(this.u_pointSize, 3.0 * (dpr || 1));
     gl.drawArrays(gl.POINTS, 0, n);

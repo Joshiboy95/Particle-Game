@@ -1,5 +1,7 @@
 // localStorage persistence, schema per design doc §9.4.
 
+import { DEFAULT_SCHEME } from './colorSchemes.js';
+
 const KEY = 'particle_flow_save';
 
 function defaultSave() {
@@ -11,6 +13,7 @@ function defaultSave() {
     settings: {
       particle_count: 4096,
       sound_enabled: true,
+      color_scheme: DEFAULT_SCHEME,
     },
   };
 }
@@ -20,7 +23,11 @@ export function loadSave() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return defaultSave();
     const parsed = JSON.parse(raw);
-    return { ...defaultSave(), ...parsed };
+    const defaults = defaultSave();
+    // Shallow merge would let an older save's `settings` object (missing
+    // newly added fields like color_scheme) blot out the fresh defaults —
+    // merge that one level deeper.
+    return { ...defaults, ...parsed, settings: { ...defaults.settings, ...(parsed.settings || {}) } };
   } catch {
     return defaultSave();
   }
