@@ -18,7 +18,7 @@ import {
   windJetHandleLenCssToStrength,
   WIND_JET_MIN_LEN_CSS,
   WIND_JET_MAX_LEN_CSS,
-  windJetEffectiveRange,
+  WIND_JET_RANGE,
   RADIAL_MIN_RADIUS,
   RADIAL_MAX_RADIUS,
   radialStrengthFromRadius,
@@ -245,7 +245,7 @@ export class DragController {
   _isInsideFootprint(tool, norm, dist) {
     if (dist < HIT_RADIUS_NORM) return true;
     if (tool.type === 'wind_jet') {
-      if (dist > windJetEffectiveRange(tool.strength)) return false;
+      if (dist > WIND_JET_RANGE) return false;
       const dirRad = (tool.params.direction || 0) * Math.PI / 180;
       const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
       const angleToPoint = Math.atan2(norm.y - tool.position.y, norm.x - tool.position.x);

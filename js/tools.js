@@ -4,13 +4,15 @@
 // Adding a new tool later = one entry here + one force function + one
 // visualization case in ui.js. Nothing else changes.
 
-// Wind-Jet's cone reach scales with its strength (fully extended handle
-// = WIND_JET_RANGE; the player controls length -> strength and angle ->
-// direction directly on the element, and the cone grows/shrinks with the
-// former). Attractor/Repulsor expose a single visual "power" handle on
+// Wind-Jet's cone reach is fixed (not tied to strength) and deliberately
+// generous, since the reach wedge is never actually drawn (see ui.js) —
+// the player only ever sees the ambient particle flow, ever, so the cone
+// itself should feel roomy rather than precisely calibrated. The player
+// controls length -> strength and angle -> direction directly on the
+// element. Attractor/Repulsor expose a single visual "power" handle on
 // the ring edge; radius and strength both derive from where that handle
 // sits, so there's effectively one on-canvas control.
-export const WIND_JET_RANGE = 0.28; // reach at max strength (handle fully extended)
+export const WIND_JET_RANGE = 0.45;
 export const WIND_JET_MIN_STRENGTH = 0.15;
 export const WIND_JET_MAX_STRENGTH = 0.9; // also the particle speed cap at full extension
 export const WIND_JET_MIN_LEN_CSS = 30;
@@ -20,15 +22,6 @@ export const WIND_JET_MAX_LEN_CSS = 300; // long drag range for granular strengt
 // velocity (direction * strength) while inside the cone — higher = snaps
 // to the target speed faster. Not user-facing, just a feel constant.
 const WIND_JET_STEER_GAIN = 8;
-
-// The cone's actual reach at the tool's current strength — scales
-// linearly from ~0 at WIND_JET_MIN_STRENGTH up to WIND_JET_RANGE at
-// WIND_JET_MAX_STRENGTH. Shared by the physics force check and every
-// visual (boundary wedge, ambient fx, click footprint) so they never
-// drift out of sync with each other.
-export function windJetEffectiveRange(strength) {
-  return WIND_JET_RANGE * (strength / WIND_JET_MAX_STRENGTH);
-}
 
 export const RADIAL_MIN_RADIUS = 0.05;
 export const RADIAL_MAX_RADIUS = 0.32;
@@ -101,7 +94,7 @@ function windJetForce(tool, px, py, vx, vy) {
   const dx = px - tool.position.x;
   const dy = py - tool.position.y;
   const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist > windJetEffectiveRange(tool.strength)) return [0, 0];
+  if (dist > WIND_JET_RANGE) return [0, 0];
 
   const dirRad = (tool.params.direction || 0) * Math.PI / 180;
   const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
