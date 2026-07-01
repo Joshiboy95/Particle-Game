@@ -1,14 +1,17 @@
-// DOM UI (palette, budget bar, modals, popover) + Canvas2D overlay
-// rendering (obstacles come from obstacles.js; this module draws the
-// emitter, target circle, tool force-field visuals, and the drag ghost).
+// DOM UI (palette, budget bar, modals) + Canvas2D overlay rendering
+// (obstacles come from obstacles.js; this module draws the emitter,
+// target circle, tool force-field visuals, and the drag ghost). There is
+// no properties panel — every tool parameter is edited by dragging
+// directly on the element via its handles (see handles.js/drag.js).
 
-import { TOOL_DEFINITIONS } from './tools.js';
+import { TOOL_DEFINITIONS, WIND_JET_RANGE, windJetStrengthToHandleLenCss } from './tools.js';
 import { toPixel, toPixelLength, cssToDevicePixel, getSize } from './coords.js';
 import { drawObstacles } from './obstacles.js';
 import { getHandlePositionsCss } from './handles.js';
 
 const TOOL_ORDER = ['wind_jet', 'attractor', 'repulsor'];
 const FILL_SMOOTHING_SECONDS = 1.0;
+const RADIAL_SPOKE_COUNT = 14;
 
 export class UI {
   constructor({ uiCanvas, dragController }) {
@@ -28,41 +31,18 @@ export class UI {
     this.completeModalEl = document.getElementById('complete-modal');
     this.nextLevelBtn = document.getElementById('next-level-btn');
 
-    this.popoverEl = document.getElementById('tool-popover');
-    this.popoverStrength = document.getElementById('popover-strength');
-    this.popoverRadius = document.getElementById('popover-radius');
-    this.popoverRemove = document.getElementById('popover-remove');
-    this.popoverTool = null;
-    this._wirePopover();
+    // Clicking outside the canvas (HUD/palette) clears the selection;
+    // clicks on the field itself are already handled by dragController's
+    // own empty-space/handle/tool hit-testing in _onCanvasDown.
+    document.addEventListener('pointerdown', (e) => {
+      if (this.dragController.state === 'idle' && e.target !== this.uiCanvas) {
+        this.dragController.deselect();
+      }
+    });
 
     this._smoothedFill = [];
     this._lastBudgetText = '';
     this._levelModalTimer = null;
-  }
-
-  _wirePopover() {
-    this.popoverStrength.addEventListener('input', () => {
-      if (this.popoverTool) this.popoverTool.strength = parseFloat(this.popoverStrength.value);
-    });
-    this.popoverRadius.addEventListener('input', () => {
-      if (this.popoverTool) this.popoverTool.radius = parseFloat(this.popoverRadius.value);
-    });
-    // Only handles clicks *outside* the canvas (e.g. on the HUD/palette);
-    // clicks on the field itself are already routed through
-    // dragController's own empty-space/handle/tool hit-testing, which
-    // calls deselect()/onDeselect() -> hidePopover() as needed. Guarding on
-    // dragController.state === 'idle' avoids fighting an in-progress drag
-    // or handle interaction.
-    document.addEventListener('pointerdown', (e) => {
-      if (
-        this.dragController.state === 'idle' &&
-        this.popoverTool &&
-        !this.popoverEl.contains(e.target) &&
-        e.target !== this.uiCanvas
-      ) {
-        this.dragController.deselect();
-      }
-    });
   }
 
   buildPalette(level, unlockedTools) {
@@ -103,32 +83,6 @@ export class UI {
       this.completeModalEl.classList.add('hidden');
       onNext();
     };
-  }
-
-  showPopover(tool, clientX, clientY) {
-    this.popoverTool = tool;
-    this.popoverStrength.value = tool.strength;
-    this.popoverRadius.value = tool.radius;
-    // Offset well clear of the selection handles (rotate/delete sit within
-    // ~50px of the tool center) so the popover's own bounding box — which
-    // captures pointer events across its whole rectangle, not just its
-    // visible controls — never overlaps and steals clicks meant for them.
-    this.popoverEl.style.left = clientX + 24 + 'px';
-    this.popoverEl.style.top = clientY + 60 + 'px';
-    this.popoverEl.classList.remove('hidden');
-    this.popoverRemove.onclick = () => {
-      this._onRemoveTool && this._onRemoveTool(tool.id);
-      this.hidePopover();
-    };
-  }
-
-  hidePopover() {
-    this.popoverTool = null;
-    this.popoverEl.classList.add('hidden');
-  }
-
-  setRemoveHandler(fn) {
-    this._onRemoveTool = fn;
   }
 
   updateHUD(level) {
@@ -207,48 +161,138 @@ export class UI {
         this.dragController.state === 'dragging-existing' &&
         this.dragController.draggedToolId === tool.id &&
         !this.dragController.dragValid;
-
       const isSelected = this.dragController.selectedToolId === tool.id;
-      ctx.strokeStyle = isDraggedInvalid
-        ? 'rgba(239, 68, 68, 0.8)'
-        : isSelected
-        ? 'rgba(226, 232, 255, 0.9)'
-        : 'rgba(148, 180, 255, 0.6)';
-      ctx.lineWidth = isSelected ? 2 : 1.5;
 
       if (tool.type === 'wind_jet') {
-        this._drawWindJet(ctx, tool, p);
+        this._drawWindJet(ctx, tool, p, isSelected, isDraggedInvalid);
       } else {
-        this._drawRadial(ctx, tool, p, tool.type === 'repulsor');
+        this._drawRadial(ctx, tool, p, tool.type === 'repulsor', isSelected, isDraggedInvalid);
       }
     }
   }
 
-  _drawWindJet(ctx, tool, p) {
-    const range = toPixelLength(tool.radius);
+  _drawWindJet(ctx, tool, p, isSelected, isInvalid) {
+    const dpr = getSize().dpr;
+    const range = toPixelLength(WIND_JET_RANGE);
     const dirRad = (tool.params.direction || 0) * Math.PI / 180;
     const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
+    const invalidTint = isInvalid ? 'rgba(239, 68, 68, 0.9)' : null;
+
+    // Faint reach wedge for context — the cone's range is fixed, not
+    // user-tunable; only length (strength) and angle (direction) are.
+    ctx.strokeStyle = invalidTint || (isSelected ? 'rgba(147, 197, 253, 0.35)' : 'rgba(147, 197, 253, 0.18)');
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
     ctx.arc(p.x, p.y, range, dirRad - spreadRad / 2, dirRad + spreadRad / 2);
     ctx.closePath();
     ctx.stroke();
+
+    // Main force vector: its length *is* the strength.
+    const lenCss = windJetStrengthToHandleLenCss(tool.strength);
+    const len = lenCss * dpr;
+    const tipX = p.x + Math.cos(dirRad) * len;
+    const tipY = p.y + Math.sin(dirRad) * len;
+
+    this._drawGradientRay(ctx, p.x, p.y, tipX, tipY, invalidTint, 2.5 * dpr);
+    this._drawArrowhead(ctx, tipX, tipY, dirRad, invalidTint || '#BFDBFE', 6 * dpr);
+
+    // Flanking flow lines for texture.
+    for (const offset of [-0.14, 0.14]) {
+      const a = dirRad + offset;
+      const flen = len * 0.65;
+      const fx = p.x + Math.cos(a) * flen;
+      const fy = p.y + Math.sin(a) * flen;
+      this._drawGradientRay(ctx, p.x, p.y, fx, fy, invalidTint, 1 * dpr, 0.5);
+    }
+
+    ctx.fillStyle = invalidTint || '#93C5FD';
     ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x + Math.cos(dirRad) * range, p.y + Math.sin(dirRad) * range);
+    ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  _drawGradientRay(ctx, x1, y1, x2, y2, tintOverride, lineWidth, alphaScale = 1) {
+    if (tintOverride) {
+      ctx.strokeStyle = tintOverride;
+    } else {
+      const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+      gradient.addColorStop(0, `rgba(191, 219, 254, ${0.95 * alphaScale})`);
+      gradient.addColorStop(1, `rgba(96, 165, 250, ${0.1 * alphaScale})`);
+      ctx.strokeStyle = gradient;
+    }
+    ctx.lineWidth = lineWidth;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
     ctx.stroke();
   }
 
-  _drawRadial(ctx, tool, p, outward) {
-    const r = toPixelLength(tool.radius);
-    for (const frac of [0.4, 0.7, 1.0]) {
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, r * frac, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-    ctx.fillStyle = ctx.strokeStyle;
+  _drawArrowhead(ctx, tipX, tipY, angle, color, size) {
+    ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+    ctx.moveTo(tipX, tipY);
+    ctx.lineTo(tipX - Math.cos(angle - 0.4) * size, tipY - Math.sin(angle - 0.4) * size);
+    ctx.lineTo(tipX - Math.cos(angle + 0.4) * size, tipY - Math.sin(angle + 0.4) * size);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Attractor/Repulsor: radiating "light" spokes from the center, each
+  // with its own gradient (bright-near-center for attractor, pulling the
+  // eye inward; bright-near-edge for repulsor, pushing it outward), plus
+  // a small arrow along each spoke showing the force's direction.
+  _drawRadial(ctx, tool, p, outward, isSelected, isInvalid) {
+    const dpr = getSize().dpr;
+    const r = toPixelLength(tool.radius);
+    const invalidTint = isInvalid ? 'rgba(239, 68, 68, 0.85)' : null;
+
+    for (let i = 0; i < RADIAL_SPOKE_COUNT; i++) {
+      const angle = (i / RADIAL_SPOKE_COUNT) * Math.PI * 2;
+      const x2 = p.x + Math.cos(angle) * r;
+      const y2 = p.y + Math.sin(angle) * r;
+
+      if (invalidTint) {
+        ctx.strokeStyle = invalidTint;
+      } else {
+        const gradient = ctx.createLinearGradient(p.x, p.y, x2, y2);
+        const innerAlpha = isSelected ? 0.95 : 0.8;
+        const outerAlpha = isSelected ? 0.12 : 0.06;
+        if (outward) {
+          gradient.addColorStop(0, `rgba(147, 197, 253, ${outerAlpha})`);
+          gradient.addColorStop(1, `rgba(191, 219, 254, ${innerAlpha})`);
+        } else {
+          gradient.addColorStop(0, `rgba(191, 219, 254, ${innerAlpha})`);
+          gradient.addColorStop(1, `rgba(147, 197, 253, ${outerAlpha})`);
+        }
+        ctx.strokeStyle = gradient;
+      }
+      ctx.lineWidth = 1.25 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Small chevron marking the force's direction along the spoke.
+      const chevronDist = outward ? r * 0.72 : r * 0.4;
+      const cx = p.x + Math.cos(angle) * chevronDist;
+      const cy = p.y + Math.sin(angle) * chevronDist;
+      const chevronAngle = outward ? angle : angle + Math.PI;
+      this._drawArrowhead(ctx, cx, cy, chevronAngle, invalidTint || 'rgba(191, 219, 254, 0.7)', 4 * dpr);
+    }
+
+    // Soft glow disc at the center.
+    const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 0.18);
+    glow.addColorStop(0, invalidTint || 'rgba(191, 219, 254, 0.6)');
+    glow.addColorStop(1, 'rgba(191, 219, 254, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = invalidTint || '#93C5FD';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -275,18 +319,19 @@ export class UI {
     const dpr = getSize().dpr;
     const toolPixel = toPixel(tool.position.x, tool.position.y);
 
-    if (handlesCss.rotate) {
-      const rp = cssToDevicePixel(handlesCss.rotate.x, handlesCss.rotate.y);
+    const dragHandle = handlesCss.vector || handlesCss.power;
+    if (dragHandle) {
+      const hp = cssToDevicePixel(dragHandle.x, dragHandle.y);
       ctx.strokeStyle = 'rgba(226, 232, 255, 0.5)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(toolPixel.x, toolPixel.y);
-      ctx.lineTo(rp.x, rp.y);
+      ctx.lineTo(hp.x, hp.y);
       ctx.stroke();
 
       ctx.fillStyle = '#60A5FA';
       ctx.beginPath();
-      ctx.arc(rp.x, rp.y, 7 * dpr, 0, Math.PI * 2);
+      ctx.arc(hp.x, hp.y, 7 * dpr, 0, Math.PI * 2);
       ctx.fill();
       ctx.strokeStyle = '#E8ECF4';
       ctx.lineWidth = 1.5;
@@ -301,8 +346,6 @@ export class UI {
     ctx.strokeStyle = '#E8ECF4';
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.strokeStyle = '#E8ECF4';
-    ctx.lineWidth = 1.5;
     const xArm = 3.5 * dpr;
     ctx.beginPath();
     ctx.moveTo(dp.x - xArm, dp.y - xArm);

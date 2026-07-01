@@ -4,14 +4,49 @@
 // Adding a new tool later = one entry here + one force function + one
 // visualization case in ui.js. Nothing else changes.
 
+// Wind-Jet's cone reach ("range") is fixed — the only two things the
+// player controls directly on the element are its length (-> strength)
+// and its angle (-> direction). Attractor/Repulsor expose a single visual
+// "power" handle on the ring edge; radius and strength both derive from
+// where that handle sits, so there's effectively one on-canvas control.
+export const WIND_JET_RANGE = 0.28;
+export const WIND_JET_MIN_STRENGTH = 0.15;
+export const WIND_JET_MAX_STRENGTH = 0.9;
+export const WIND_JET_MIN_LEN_CSS = 24;
+export const WIND_JET_MAX_LEN_CSS = 160;
+
+export const RADIAL_MIN_RADIUS = 0.05;
+export const RADIAL_MAX_RADIUS = 0.32;
+const RADIAL_MIN_STRENGTH = 0.25;
+const RADIAL_MAX_STRENGTH = 1.3;
+
+function clamp01(t) {
+  return Math.max(0, Math.min(1, t));
+}
+
+export function radialStrengthFromRadius(radius) {
+  const t = (radius - RADIAL_MIN_RADIUS) / (RADIAL_MAX_RADIUS - RADIAL_MIN_RADIUS);
+  return RADIAL_MIN_STRENGTH + clamp01(t) * (RADIAL_MAX_STRENGTH - RADIAL_MIN_STRENGTH);
+}
+
+export function windJetStrengthToHandleLenCss(strength) {
+  const t = (strength - WIND_JET_MIN_STRENGTH) / (WIND_JET_MAX_STRENGTH - WIND_JET_MIN_STRENGTH);
+  return WIND_JET_MIN_LEN_CSS + clamp01(t) * (WIND_JET_MAX_LEN_CSS - WIND_JET_MIN_LEN_CSS);
+}
+
+export function windJetHandleLenCssToStrength(lenCss) {
+  const t = (lenCss - WIND_JET_MIN_LEN_CSS) / (WIND_JET_MAX_LEN_CSS - WIND_JET_MIN_LEN_CSS);
+  return WIND_JET_MIN_STRENGTH + clamp01(t) * (WIND_JET_MAX_STRENGTH - WIND_JET_MIN_STRENGTH);
+}
+
 export const TOOL_DEFINITIONS = {
   wind_jet: {
     type: 'wind_jet',
     label: 'Wind-Jet',
     cost: 10,
     unlockedAtLevel: 1,
-    defaultRadius: 0.3,      // cone range
-    defaultStrength: 0.35,
+    defaultRadius: WIND_JET_RANGE,
+    defaultStrength: 0.4,
     defaultParams: { direction: 0, spreadAngle: 30 },
   },
   attractor: {
@@ -116,7 +151,7 @@ export function accumulateForces(pool, activeTools, ambientForce, outFx, outFy) 
 
 export function createToolInstance(type, position) {
   const def = TOOL_DEFINITIONS[type];
-  return {
+  const tool = {
     id: 'tool_' + Math.random().toString(36).slice(2, 10),
     type,
     position: { x: position.x, y: position.y },
@@ -124,4 +159,8 @@ export function createToolInstance(type, position) {
     strength: def.defaultStrength,
     params: { ...def.defaultParams },
   };
+  if (type === 'attractor' || type === 'repulsor') {
+    tool.strength = radialStrengthFromRadius(tool.radius);
+  }
+  return tool;
 }

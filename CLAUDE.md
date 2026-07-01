@@ -56,12 +56,24 @@ budget.
   adapted from the sibling project's proven canvas/DPR/shader-compile
   pattern). A transparent Canvas2D overlay on top draws everything else:
   obstacles, emitter, target circle, tool force-field visuals, and hosts
-  the DOM-based UI (palette, budget bar, modals, popovers).
+  the DOM-based UI (palette, budget bar, modals).
 - **Tool placement uses a custom Pointer Events drag system** (not the
   native HTML5 Drag-and-Drop API, which has poor touch support and awkward
-  canvas-drop-target coordinate handling). One state machine handles both
-  dragging a new tool from the palette and repositioning an already-placed
-  tool.
+  canvas-drop-target coordinate handling). One state machine handles
+  dragging a new tool from the palette, repositioning an already-placed
+  tool, and (once selected) dragging its handles.
+- **No properties panel.** Every tunable parameter is edited by dragging
+  directly on the selected tool via `js/handles.js`: Wind-Jet has one
+  "vector" handle whose position simultaneously encodes direction (angle)
+  and strength (distance — its length *is* its strength, its reach/range
+  is fixed); Attractor/Repulsor have one "power" handle sitting right on
+  the visible ring edge, dragged radially to resize, which derives
+  strength from the new radius (`radialStrengthFromRadius` in
+  `js/tools.js`). Every tool also has a delete handle. Handle geometry and
+  hit-testing must stay in CSS-pixel space (`toCssPixel`/`toCssLength` in
+  `js/coords.js`), not normalized game space — a fixed on-screen
+  offset/angle decomposed through normalized x/y and re-projected via
+  `toPixel` stretches unevenly on a non-square viewport.
 - Levels are pure JSON-shaped data (schema in doc §9.1) exported from
   `js/data/levels.js` — adding a level requires no code changes.
 - Adding a new tool requires: one force function in `js/tools.js`, one

@@ -82,3 +82,14 @@ export function toCssPixel(nx, ny) {
 export function cssToDevicePixel(cssX, cssY) {
   return { x: cssX * state.dpr, y: cssY * state.dpr };
 }
+
+// normalized length -> CSS-pixel length, and back. Same min(width,height)
+// convention as toPixelLength, just in CSS-pixel units — used to place a
+// draggable handle exactly on a radius circle's visible edge.
+export function toCssLength(nLen) {
+  return nLen * Math.min(state.cssWidth, state.cssHeight);
+}
+
+export function cssLengthToNormLen(cssLen) {
+  return cssLen / Math.min(state.cssWidth, state.cssHeight);
+}

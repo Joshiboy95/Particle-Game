@@ -32,12 +32,9 @@ const dragController = new DragController({
   canvas: uiCanvas,
   getLevel: () => level,
   onChange: () => {},
-  onSelect: (tool, x, y) => ui.showPopover(tool, x, y),
-  onDeselect: () => ui.hidePopover(),
 });
 
 const ui = new UI({ uiCanvas, dragController });
-ui.setRemoveHandler((toolId) => level.removeTool(toolId));
 
 function startLevel(index) {
   dragController.reset();

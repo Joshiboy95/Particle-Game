@@ -1,32 +1,42 @@
 // Custom Pointer Events drag system: one state machine handles dragging a
 // new tool in from the palette, repositioning an already-placed tool, and
-// (once a tool is selected) dragging its rotate/delete handles. Chosen over
-// the native HTML5 Drag-and-Drop API because that API has weak touch
-// support and awkward coordinate handling against a canvas drop target
-// (doc §12 flags mobile/touch as an open item — this keeps the door open
-// for it).
+// (once a tool is selected) dragging its vector/power/delete handles.
+// Chosen over the native HTML5 Drag-and-Drop API because that API has
+// weak touch support and awkward coordinate handling against a canvas
+// drop target (doc §12 flags mobile/touch as an open item — this keeps
+// the door open for it).
 //
-// Selecting a tool (tapping it, or finishing a drag on it) shows its
-// handles and opens the same properties popover right-click used to open
-// on its own — right-click is kept too, as a shortcut, but selection no
-// longer depends on it.
+// There is no separate properties panel: every tunable parameter is
+// edited by dragging directly on the element itself (see handles.js) —
+// tapping a placed tool (or finishing a drag on it) just selects it,
+// which shows its handles.
 
-import { clientToNorm, toCssPixel } from './coords.js';
+import { clientToNorm, toCssPixel, cssLengthToNormLen } from './coords.js';
 import { isPointBlocked } from './obstacles.js';
 import { hitTestHandles } from './handles.js';
+import {
+  windJetHandleLenCssToStrength,
+  WIND_JET_MIN_LEN_CSS,
+  WIND_JET_MAX_LEN_CSS,
+  RADIAL_MIN_RADIUS,
+  RADIAL_MAX_RADIUS,
+  radialStrengthFromRadius,
+} from './tools.js';
 
 const HIT_RADIUS_NORM = 0.035; // click/tap tolerance for picking up a placed tool
 const TAP_MOVE_THRESHOLD_NORM = 0.01; // below this, a press+release counts as a tap, not a drag
 
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, v));
+}
+
 export class DragController {
-  constructor({ canvas, getLevel, onChange, onSelect, onDeselect }) {
+  constructor({ canvas, getLevel, onChange }) {
     this.canvas = canvas;
     this.getLevel = getLevel;
     this.onChange = onChange || (() => {});
-    this.onSelect = onSelect || (() => {});
-    this.onDeselect = onDeselect || (() => {});
 
-    this.state = 'idle'; // idle | dragging-new | dragging-existing | handle-rotate
+    this.state = 'idle'; // idle | dragging-new | dragging-existing | handle-vector | handle-power
     this.pendingType = null;
     this.draggedToolId = null;
     this.originalPosition = null;
@@ -48,9 +58,7 @@ export class DragController {
   }
 
   deselect() {
-    if (!this.selectedToolId) return;
     this.selectedToolId = null;
-    this.onDeselect();
   }
 
   // Called when switching levels: the old Level's tool references (and
@@ -58,11 +66,6 @@ export class DragController {
   reset() {
     this._cancelDrag();
     this.deselect();
-  }
-
-  _select(tool, clientX, clientY) {
-    this.selectedToolId = tool.id;
-    this.onSelect(tool, clientX, clientY);
   }
 
   _onPaletteDown(e, toolType) {
@@ -98,10 +101,10 @@ export class DragController {
           this.onChange();
           return;
         }
-        if (hit === 'rotate') {
+        if (hit === 'vector' || hit === 'power') {
           e.preventDefault();
           e.stopPropagation();
-          this.state = 'handle-rotate';
+          this.state = hit === 'vector' ? 'handle-vector' : 'handle-power';
           this.handleToolId = selectedTool.id;
           this.activePointerId = e.pointerId;
           window.addEventListener('pointermove', this._onMove);
@@ -119,7 +122,7 @@ export class DragController {
       e.stopPropagation();
 
       if (e.button === 2) {
-        this._select(tool, e.clientX, e.clientY);
+        this.selectedToolId = tool.id;
         return;
       }
 
@@ -151,16 +154,28 @@ export class DragController {
       const dy = norm.y - this._downNorm.y;
       if (Math.sqrt(dx * dx + dy * dy) > TAP_MOVE_THRESHOLD_NORM) this._hasMoved = true;
       level.moveTool(this.draggedToolId, norm);
-    } else if (this.state === 'handle-rotate') {
+    } else if (this.state === 'handle-vector' || this.state === 'handle-power') {
+      // CSS-pixel space, not normalized: a fixed-radius circle of drag
+      // positions must map to a real circle on screen (isotropic), which
+      // normalized space can't guarantee on a non-square field.
       const tool = level.getTool(this.handleToolId);
       if (tool) {
-        // CSS-pixel space, not normalized: a fixed-radius circle of drag
-        // positions must map to a real circle on screen (isotropic),
-        // which normalized space can't guarantee on a non-square field.
         const center = toCssPixel(tool.position.x, tool.position.y);
         const dx = e.clientX - center.x;
         const dy = e.clientY - center.y;
-        tool.params.direction = (Math.atan2(dy, dx) * 180) / Math.PI;
+        const distCss = Math.sqrt(dx * dx + dy * dy);
+
+        if (this.state === 'handle-vector') {
+          // Length -> strength, angle -> direction: both edited by one drag.
+          tool.params.direction = (Math.atan2(dy, dx) * 180) / Math.PI;
+          tool.strength = windJetHandleLenCssToStrength(clamp(distCss, WIND_JET_MIN_LEN_CSS, WIND_JET_MAX_LEN_CSS));
+        } else {
+          // Radial power handle: distance only (angle is ignored — the
+          // handle stays pinned to its reference angle, purely a resize).
+          const radius = clamp(cssLengthToNormLen(distCss), RADIAL_MIN_RADIUS, RADIAL_MAX_RADIUS);
+          tool.radius = radius;
+          tool.strength = radialStrengthFromRadius(radius);
+        }
       }
       return;
     } else {
@@ -176,14 +191,15 @@ export class DragController {
     if (this.state === 'dragging-new') {
       if (this.dragValid) {
         const placed = level.placeTool(this.pendingType, this.ghostPosition);
-        if (placed) this._select(placed, e.clientX, e.clientY);
+        if (placed) this.selectedToolId = placed.id;
       }
     } else if (this.state === 'dragging-existing') {
       if (!this.dragValid) level.moveTool(this.draggedToolId, this.originalPosition);
       const tool = level.getTool(this.draggedToolId);
-      if (tool) this._select(tool, e.clientX, e.clientY);
+      if (tool) this.selectedToolId = tool.id;
     }
-    // handle-rotate: nothing further to do on release, selection is unchanged.
+    // handle-vector / handle-power: nothing further to do on release,
+    // selection is unchanged.
 
     this._cancelDrag();
     this.onChange();
