@@ -14,10 +14,11 @@ import { getMainConfig } from './fxConfig.js';
 
 const MAX_PARTICLES = 4096;
 
+const toolFxCanvas = document.getElementById('toolfx-canvas');
 const glCanvas = document.getElementById('gl-canvas');
 const uiCanvas = document.getElementById('ui-canvas');
 
-initCoords([glCanvas, uiCanvas]);
+initCoords([toolFxCanvas, glCanvas, uiCanvas]);
 
 const gl = initGL(glCanvas);
 const renderer = new ParticleRenderer(gl, MAX_PARTICLES);
@@ -35,7 +36,7 @@ const dragController = new DragController({
   onChange: () => {},
 });
 
-const ui = new UI({ uiCanvas, dragController });
+const ui = new UI({ toolFxCanvas, uiCanvas, dragController });
 
 function startLevel(index) {
   dragController.reset();

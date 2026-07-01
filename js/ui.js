@@ -11,16 +11,25 @@ import { toPixel, toPixelLength, cssToDevicePixel, getSize } from './coords.js';
 import { drawObstacles } from './obstacles.js';
 import { getHandlePositionsCss } from './handles.js';
 import { ToolFxManager } from './toolFx.js';
-import { SCHEME_META } from './colorSchemes.js';
+import { SCHEME_META, sampleGradient } from './colorSchemes.js';
 import { MAIN_SCHEMA, TOOL_FX_SCHEMA, getMainConfig, setMainParam, getToolConfig, setToolParam, serializeForCopy } from './fxConfig.js';
 
 const TOOL_ORDER = ['wind_jet', 'attractor', 'repulsor'];
 const FILL_SMOOTHING_SECONDS = 1.0;
 
+function rgbCss(rgb01) {
+  const r = Math.round(rgb01[0] * 255);
+  const g = Math.round(rgb01[1] * 255);
+  const b = Math.round(rgb01[2] * 255);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 export class UI {
-  constructor({ uiCanvas, dragController }) {
+  constructor({ toolFxCanvas, uiCanvas, dragController }) {
     this.uiCanvas = uiCanvas;
     this.ctx = uiCanvas.getContext('2d');
+    this.toolFxCanvas = toolFxCanvas;
+    this.toolFxCtx = toolFxCanvas.getContext('2d');
     this.dragController = dragController;
     this.toolFx = new ToolFxManager();
 
@@ -241,6 +250,10 @@ export class UI {
     return btn;
   }
 
+  // Consistent layout for every tool (glyph + label + cost, same sizing
+  // regardless of label length or lock state) — the glyph's colors are
+  // sampled from that tool's own current gradient config, so the palette
+  // always matches whatever look the player has customized in the panel.
   buildPalette(level, unlockedTools) {
     this.paletteEl.innerHTML = '';
     for (const type of TOOL_ORDER) {
@@ -248,7 +261,27 @@ export class UI {
       const unlocked = unlockedTools.includes(type) && level.def.available_tools.includes(type);
       const icon = document.createElement('div');
       icon.className = 'tool-icon' + (unlocked ? '' : ' locked');
-      icon.innerHTML = `<span>${def.label}</span><span class="tool-cost">${def.cost} EP</span>`;
+
+      const cfg = getToolConfig(type);
+      const glyph = document.createElement('span');
+      glyph.className = 'tool-icon-glyph';
+      if (unlocked) {
+        const headRgb = sampleGradient(cfg.gradient, 1, cfg.custom_gradient);
+        const midRgb = sampleGradient(cfg.gradient, 0.4, cfg.custom_gradient);
+        glyph.style.background = `radial-gradient(circle, ${rgbCss(headRgb)}, ${rgbCss(midRgb)} 55%, transparent 75%)`;
+      }
+      icon.appendChild(glyph);
+
+      const label = document.createElement('span');
+      label.className = 'tool-label';
+      label.textContent = def.label;
+      icon.appendChild(label);
+
+      const cost = document.createElement('span');
+      cost.className = 'tool-cost';
+      cost.textContent = `${def.cost} EP`;
+      icon.appendChild(cost);
+
       if (!unlocked) {
         const lockLabel = document.createElement('span');
         lockLabel.className = 'tool-lock-label';
@@ -293,20 +326,27 @@ export class UI {
     this.throughputEl.textContent = Math.round(efficiency * 100) + '%';
   }
 
+  // Stacking (back to front): toolfx-canvas -> gl-canvas (main particles,
+  // drawn separately in main.js) -> ui-canvas -> DOM UI. So tool elements
+  // and their ambient particles render on the bottom canvas (behind the
+  // main particle stream), while level objects (obstacles/emitter/target)
+  // and transient interaction feedback (drag ghost, selection handles)
+  // render on the top one (in front of the main particle stream).
   render(level, dt) {
-    const ctx = this.ctx;
-    ctx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
     const dpr = getSize().dpr;
 
+    const fxCtx = this.toolFxCtx;
+    fxCtx.clearRect(0, 0, this.toolFxCanvas.width, this.toolFxCanvas.height);
+    this.toolFx.step(level.activeTools, dt, getToolConfig);
+    this._drawToolBoundaries(fxCtx, level, dpr);
+    this.toolFx.draw(fxCtx, level.activeTools, dpr, getToolConfig);
+    this._drawToolCenters(fxCtx, level, dpr);
+
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
     drawObstacles(ctx, level.def.obstacles);
     this._drawEmitters(ctx, level.def.emitters);
     this._drawTargets(ctx, level, dt);
-
-    this.toolFx.step(level.activeTools, dt, getToolConfig);
-    this._drawToolBoundaries(ctx, level, dpr);
-    this.toolFx.draw(ctx, level.activeTools, dpr, getToolConfig);
-    this._drawToolCenters(ctx, level, dpr);
-
     this._drawDragGhost(ctx, level);
     this._drawSelectionHandles(ctx, level);
   }
