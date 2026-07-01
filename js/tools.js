@@ -14,7 +14,7 @@
 // sits, so there's effectively one on-canvas control.
 export const WIND_JET_RANGE = 0.2;
 export const WIND_JET_MIN_STRENGTH = 0.15;
-export const WIND_JET_MAX_STRENGTH = 0.9; // also the particle speed cap at full extension
+export const WIND_JET_MAX_STRENGTH = 0.45; // also the particle speed cap at full extension
 export const WIND_JET_MIN_LEN_CSS = 30;
 export const WIND_JET_MAX_LEN_CSS = 300; // long drag range for granular strength control
 
