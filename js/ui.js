@@ -3,8 +3,9 @@
 // emitter, target circle, tool force-field visuals, and the drag ghost).
 
 import { TOOL_DEFINITIONS } from './tools.js';
-import { toPixel, toPixelLength } from './coords.js';
+import { toPixel, toPixelLength, cssToDevicePixel, getSize } from './coords.js';
 import { drawObstacles } from './obstacles.js';
+import { getHandlePositionsCss } from './handles.js';
 
 const TOOL_ORDER = ['wind_jet', 'attractor', 'repulsor'];
 const FILL_SMOOTHING_SECONDS = 1.0;
@@ -46,8 +47,21 @@ export class UI {
     this.popoverRadius.addEventListener('input', () => {
       if (this.popoverTool) this.popoverTool.radius = parseFloat(this.popoverRadius.value);
     });
+    // Only handles clicks *outside* the canvas (e.g. on the HUD/palette);
+    // clicks on the field itself are already routed through
+    // dragController's own empty-space/handle/tool hit-testing, which
+    // calls deselect()/onDeselect() -> hidePopover() as needed. Guarding on
+    // dragController.state === 'idle' avoids fighting an in-progress drag
+    // or handle interaction.
     document.addEventListener('pointerdown', (e) => {
-      if (this.popoverTool && !this.popoverEl.contains(e.target)) this.hidePopover();
+      if (
+        this.dragController.state === 'idle' &&
+        this.popoverTool &&
+        !this.popoverEl.contains(e.target) &&
+        e.target !== this.uiCanvas
+      ) {
+        this.dragController.deselect();
+      }
     });
   }
 
@@ -95,8 +109,12 @@ export class UI {
     this.popoverTool = tool;
     this.popoverStrength.value = tool.strength;
     this.popoverRadius.value = tool.radius;
-    this.popoverEl.style.left = clientX + 'px';
-    this.popoverEl.style.top = clientY + 'px';
+    // Offset well clear of the selection handles (rotate/delete sit within
+    // ~50px of the tool center) so the popover's own bounding box — which
+    // captures pointer events across its whole rectangle, not just its
+    // visible controls — never overlaps and steals clicks meant for them.
+    this.popoverEl.style.left = clientX + 24 + 'px';
+    this.popoverEl.style.top = clientY + 60 + 'px';
     this.popoverEl.classList.remove('hidden');
     this.popoverRemove.onclick = () => {
       this._onRemoveTool && this._onRemoveTool(tool.id);
@@ -134,6 +152,7 @@ export class UI {
     this._drawTargets(ctx, level, dt);
     this._drawTools(ctx, level);
     this._drawDragGhost(ctx, level);
+    this._drawSelectionHandles(ctx, level);
   }
 
   _drawEmitters(ctx, emitters) {
@@ -189,8 +208,13 @@ export class UI {
         this.dragController.draggedToolId === tool.id &&
         !this.dragController.dragValid;
 
-      ctx.strokeStyle = isDraggedInvalid ? 'rgba(239, 68, 68, 0.8)' : 'rgba(148, 180, 255, 0.6)';
-      ctx.lineWidth = 1.5;
+      const isSelected = this.dragController.selectedToolId === tool.id;
+      ctx.strokeStyle = isDraggedInvalid
+        ? 'rgba(239, 68, 68, 0.8)'
+        : isSelected
+        ? 'rgba(226, 232, 255, 0.9)'
+        : 'rgba(148, 180, 255, 0.6)';
+      ctx.lineWidth = isSelected ? 2 : 1.5;
 
       if (tool.type === 'wind_jet') {
         this._drawWindJet(ctx, tool, p);
@@ -238,6 +262,53 @@ export class UI {
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  _drawSelectionHandles(ctx, level) {
+    const toolId = this.dragController.selectedToolId;
+    if (!toolId) return;
+    const tool = level.getTool(toolId);
+    if (!tool) return;
+
+    const handlesCss = getHandlePositionsCss(tool);
+    const dpr = getSize().dpr;
+    const toolPixel = toPixel(tool.position.x, tool.position.y);
+
+    if (handlesCss.rotate) {
+      const rp = cssToDevicePixel(handlesCss.rotate.x, handlesCss.rotate.y);
+      ctx.strokeStyle = 'rgba(226, 232, 255, 0.5)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(toolPixel.x, toolPixel.y);
+      ctx.lineTo(rp.x, rp.y);
+      ctx.stroke();
+
+      ctx.fillStyle = '#60A5FA';
+      ctx.beginPath();
+      ctx.arc(rp.x, rp.y, 7 * dpr, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#E8ECF4';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    const dp = cssToDevicePixel(handlesCss.delete.x, handlesCss.delete.y);
+    ctx.fillStyle = '#B91C1C';
+    ctx.beginPath();
+    ctx.arc(dp.x, dp.y, 8 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#E8ECF4';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = '#E8ECF4';
+    ctx.lineWidth = 1.5;
+    const xArm = 3.5 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(dp.x - xArm, dp.y - xArm);
+    ctx.lineTo(dp.x + xArm, dp.y + xArm);
+    ctx.moveTo(dp.x + xArm, dp.y - xArm);
+    ctx.lineTo(dp.x - xArm, dp.y + xArm);
     ctx.stroke();
   }
 }

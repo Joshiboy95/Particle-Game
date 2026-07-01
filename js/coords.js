@@ -66,3 +66,19 @@ export function clientToNorm(clientX, clientY, canvasEl) {
 export function toPixelLength(nLen) {
   return nLen * Math.min(state.width, state.height);
 }
+
+// normalized -> CSS pixels (the frame pointer events' clientX/clientY use,
+// given the canvas fills the viewport from (0,0)). CSS pixels are square,
+// so this is the right space for UI decorations whose on-screen distance
+// from a point must be isotropic (e.g. a handle sitting "46px away" in
+// every direction) — unlike toPixel, which scales x/y independently and
+// would turn a fixed offset into an ellipse on a non-square viewport.
+export function toCssPixel(nx, ny) {
+  return { x: nx * state.cssWidth, y: ny * state.cssHeight };
+}
+
+// CSS pixels -> device pixels (the canvas drawing-buffer space toPixel
+// uses), for rendering something computed in toCssPixel's space.
+export function cssToDevicePixel(cssX, cssY) {
+  return { x: cssX * state.dpr, y: cssY * state.dpr };
+}
