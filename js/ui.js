@@ -185,6 +185,8 @@ export class UI {
   }
 
   _drawWindJetBoundary(ctx, tool, p, dpr, isSelected, isInvalid) {
+    if (!isSelected && !isInvalid) return; // reach wedge/core beam only shown while selected
+
     const range = toPixelLength(WIND_JET_RANGE);
     const dirRad = (tool.params.direction || 0) * Math.PI / 180;
     const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
@@ -192,7 +194,7 @@ export class UI {
 
     // Faint reach wedge for context — the cone's range is fixed, not
     // user-tunable; only length (strength) and angle (direction) are.
-    ctx.strokeStyle = invalidTint || (isSelected ? 'rgba(147, 197, 253, 0.35)' : 'rgba(147, 197, 253, 0.18)');
+    ctx.strokeStyle = invalidTint || 'rgba(147, 197, 253, 0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y);
@@ -200,9 +202,7 @@ export class UI {
     ctx.closePath();
     ctx.stroke();
 
-    // Persistent core beam: always visible (not just when selected) so
-    // the current strength/direction reads at a glance; its length *is*
-    // the strength.
+    // Core beam: length *is* the strength.
     const len = windJetStrengthToHandleLenCss(tool.strength) * dpr;
     const tipX = p.x + Math.cos(dirRad) * len;
     const tipY = p.y + Math.sin(dirRad) * len;
@@ -226,12 +226,10 @@ export class UI {
   }
 
   _drawRadialBoundary(ctx, tool, p, dpr, isSelected, isInvalid) {
+    if (!isSelected && !isInvalid) return; // ring outline only shown while selected
+
     const r = toPixelLength(tool.radius);
-    ctx.strokeStyle = isInvalid
-      ? 'rgba(239, 68, 68, 0.85)'
-      : isSelected
-      ? 'rgba(147, 197, 253, 0.4)'
-      : 'rgba(147, 197, 253, 0.2)';
+    ctx.strokeStyle = isInvalid ? 'rgba(239, 68, 68, 0.85)' : 'rgba(147, 197, 253, 0.4)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
