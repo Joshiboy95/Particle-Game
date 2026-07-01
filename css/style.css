@@ -269,6 +269,25 @@ html, body {
   color: #E8ECF4;
 }
 
+.custom-stops-row {
+  margin-top: -4px;
+}
+
+.custom-stops {
+  display: flex;
+  gap: 6px;
+}
+
+.custom-stops input[type='color'] {
+  width: 28px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid #2A3040;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
 /* --- Tool palette --- */
 
 #toolpalette {

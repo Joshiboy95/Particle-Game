@@ -76,11 +76,16 @@ export class UI {
 
     const mainCfg = getMainConfig();
     container.appendChild(this._buildSubheader('Partikel'));
-    container.appendChild(
-      this._buildSchemeSwatchList(mainCfg.color_scheme, (key) => {
-        setMainParam('color_scheme', key);
-      })
-    );
+    const mainSwatchList = this._buildSchemeSwatchList(mainCfg.color_scheme, mainCfg.custom_gradient, (key) => {
+      setMainParam('color_scheme', key);
+      mainCustomRow.style.display = key === 'custom' ? 'flex' : 'none';
+    });
+    container.appendChild(mainSwatchList);
+    const mainCustomRow = this._buildCustomStopsEditor(mainCfg.custom_gradient, mainCfg.color_scheme === 'custom', (newStops) => {
+      setMainParam('custom_gradient', newStops);
+      this._updateSwatchPreview(mainSwatchList, newStops);
+    });
+    container.appendChild(mainCustomRow);
     for (const paramDef of MAIN_SCHEMA) {
       container.appendChild(this._buildRangeRow(paramDef, mainCfg[paramDef.key], (v) => setMainParam(paramDef.key, v)));
     }
@@ -89,7 +94,18 @@ export class UI {
       const cfg = getToolConfig(type);
       container.appendChild(this._buildSubheader(TOOL_DEFINITIONS[type].label));
       for (const paramDef of TOOL_FX_SCHEMA[type]) {
-        if (paramDef.type === 'select') {
+        if (paramDef.key === 'gradient') {
+          let customRow;
+          const selectRow = this._buildSelectRow(paramDef, cfg.gradient, (v) => {
+            setToolParam(type, 'gradient', v);
+            customRow.style.display = v === 'custom' ? 'flex' : 'none';
+          });
+          container.appendChild(selectRow);
+          customRow = this._buildCustomStopsEditor(cfg.custom_gradient, cfg.gradient === 'custom', (newStops) => {
+            setToolParam(type, 'custom_gradient', newStops);
+          });
+          container.appendChild(customRow);
+        } else if (paramDef.type === 'select') {
           container.appendChild(this._buildSelectRow(paramDef, cfg[paramDef.key], (v) => setToolParam(type, paramDef.key, v)));
         } else {
           container.appendChild(this._buildRangeRow(paramDef, cfg[paramDef.key], (v) => setToolParam(type, paramDef.key, v)));
@@ -98,6 +114,38 @@ export class UI {
     }
 
     container.appendChild(this._buildCopyButton());
+  }
+
+  // 3 color-picker inputs for a per-element "Eigener" gradient. Kept as a
+  // dedicated control (not part of the generic range/select schema loop)
+  // since editing color stops isn't expressible as a single input.
+  _buildCustomStopsEditor(stops, visible, onChangeStops) {
+    const row = document.createElement('div');
+    row.className = 'param-row custom-stops-row';
+    row.style.display = visible ? 'flex' : 'none';
+    const wrap = document.createElement('div');
+    wrap.className = 'custom-stops';
+    let current = stops;
+    stops.forEach((hex, i) => {
+      const input = document.createElement('input');
+      input.type = 'color';
+      input.value = hex;
+      input.addEventListener('input', () => {
+        current = [...current];
+        current[i] = input.value;
+        onChangeStops(current);
+      });
+      wrap.appendChild(input);
+    });
+    row.appendChild(wrap);
+    return row;
+  }
+
+  _updateSwatchPreview(swatchListEl, stops) {
+    const customRow = swatchListEl.querySelector('.scheme-row[data-custom-swatch]');
+    if (!customRow) return;
+    const swatch = customRow.querySelector('.scheme-swatch');
+    swatch.style.background = `linear-gradient(90deg,${stops.join(',')})`;
   }
 
   _buildSubheader(text) {
@@ -151,15 +199,18 @@ export class UI {
     return row;
   }
 
-  _buildSchemeSwatchList(activeKey, onSelect) {
+  _buildSchemeSwatchList(activeKey, customStops, onSelect) {
     const wrap = document.createElement('div');
     wrap.className = 'scheme-list';
     for (const meta of SCHEME_META) {
       const row = document.createElement('div');
       row.className = 'scheme-row' + (meta.key === activeKey ? ' active' : '');
+      const isCustom = meta.key === 'custom';
+      if (isCustom) row.dataset.customSwatch = 'true';
+      const preview = isCustom ? `linear-gradient(90deg,${customStops.join(',')})` : meta.preview;
       row.innerHTML =
         '<span class="scheme-dot"></span>' +
-        `<span class="scheme-swatch" style="background:${meta.preview}"></span>` +
+        `<span class="scheme-swatch" style="background:${preview}"></span>` +
         `<span class="scheme-label">${meta.label}</span>`;
       row.addEventListener('click', () => {
         wrap.querySelectorAll('.scheme-row').forEach((r) => r.classList.remove('active'));

@@ -3,23 +3,26 @@
 // never touch the physics simulation in particles.js/tools.js and are not
 // influenced by any other tool; each tool owns an independent set.
 //
-// Count/speed/gradient/line-width are live-tunable per tool type via the
-// settings panel (see fxConfig.js) — this module just reads whatever the
-// current config says each frame/step, it doesn't own the values.
+// Count/speed/length/gradient/line-width are live-tunable per tool type
+// via the settings panel (see fxConfig.js) — this module just reads
+// whatever the current config says each frame/step, it doesn't own the
+// values.
 //
-// Each streak is a comet trail from a *fixed* spawn anchor to a *moving*
-// head, so it visibly grows/shrinks with progress instead of sliding as a
-// constant-length dash — with many particles at staggered phases, this
-// produces a dense burst of varying-length trails converging on (or
-// erupting from) the center, rather than a ring of uniform dashes.
+// Each particle travels from a fixed anchor point toward a moving head
+// (anchored at the center for wind_jet/repulsor, at the ring edge for
+// attractor), but only the last `length` pixels of that journey are
+// actually drawn — a short trailing segment behind the head, not the
+// whole anchor-to-head span. That's what keeps them reading as dots
+// (length near its minimum) rather than long lines by default, while
+// still letting the player stretch them into streaks/comets.
 //
 // Motion per type:
-//  - wind_jet: anchored at the center, head drifts outward through the
-//    fixed cone in the wind direction (gentle sinusoidal "gust" wobble).
-//  - attractor: anchored at the ring edge, head races inward toward the
-//    center (accelerating, with a slow curl) — a graceful pull.
-//  - repulsor: anchored at the center, head blasts straight outward to
-//    the ring edge (decelerating, matching the force's real falloff).
+//  - wind_jet: head drifts outward from the center through the fixed
+//    cone in the wind direction (gentle sinusoidal "gust" wobble).
+//  - attractor: head races inward from the ring edge toward the center
+//    (accelerating, with a slow curl) — a graceful pull.
+//  - repulsor: head blasts outward from the center to the ring edge
+//    (decelerating, matching the force's real falloff).
 
 import { toPixel, toPixelLength } from './coords.js';
 import { WIND_JET_RANGE } from './tools.js';
@@ -60,6 +63,15 @@ function respawn(p, type) {
   p.progress = 0;
 }
 
+// Moves `dist` backward from `headDist` toward `anchorDist` by `segLen`,
+// without overshooting past the anchor — used to find the trailing point
+// regardless of which direction (growing or shrinking distance) this
+// particle's journey runs.
+function trailBackFrom(headDist, anchorDist, segLen) {
+  if (headDist >= anchorDist) return Math.max(anchorDist, headDist - segLen);
+  return Math.min(anchorDist, headDist + segLen);
+}
+
 class ToolFx {
   constructor(type, count) {
     this.type = type;
@@ -91,31 +103,36 @@ class ToolFx {
     }
   }
 
-  draw(ctx, tool, dpr, gradientKey, lineWidthMultiplier) {
-    if (this.type === 'wind_jet') this._drawWind(ctx, tool, dpr, gradientKey, lineWidthMultiplier);
-    else this._drawRadial(ctx, tool, dpr, this.type === 'repulsor', gradientKey, lineWidthMultiplier);
+  draw(ctx, tool, dpr, cfg) {
+    if (this.type === 'wind_jet') this._drawWind(ctx, tool, dpr, cfg);
+    else this._drawRadial(ctx, tool, dpr, this.type === 'repulsor', cfg);
   }
 
-  _drawWind(ctx, tool, dpr, gradientKey, lineWidthMultiplier) {
+  _drawWind(ctx, tool, dpr, cfg) {
     const center = toPixel(tool.position.x, tool.position.y);
     const dirRad = (tool.params.direction || 0) * Math.PI / 180;
     const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
     const baseRange = toPixelLength(WIND_JET_RANGE);
+    const segLen = cfg.length * dpr;
 
     for (const p of this.particles) {
       const wobble = Math.sin(p.progress * Math.PI * 2 + p.wobblePhase) * 0.05;
       const angle = dirRad + p.angleJitter * spreadRad * 0.5 + wobble;
       const headDist = p.progress * baseRange * p.reachFactor;
+      const tailDist = trailBackFrom(headDist, 0, segLen);
+
       const hx = center.x + Math.cos(angle) * headDist;
       const hy = center.y + Math.sin(angle) * headDist;
-      // Anchored at the center — the trail lengthens outward as it grows.
-      this._strokeTrail(ctx, center.x, center.y, hx, hy, gradientKey, p.progress, lineWidthMultiplier, dpr);
+      const tx = center.x + Math.cos(angle) * tailDist;
+      const ty = center.y + Math.sin(angle) * tailDist;
+      this._strokeTrail(ctx, tx, ty, hx, hy, cfg, p.progress, dpr);
     }
   }
 
-  _drawRadial(ctx, tool, dpr, outward, gradientKey, lineWidthMultiplier) {
+  _drawRadial(ctx, tool, dpr, outward, cfg) {
     const center = toPixel(tool.position.x, tool.position.y);
     const baseRadius = toPixelLength(tool.radius);
+    const segLen = cfg.length * dpr;
 
     for (const p of this.particles) {
       const edgeRadius = baseRadius * p.edgeFactor;
@@ -123,16 +140,17 @@ class ToolFx {
         ? edgeRadius * (1 - Math.pow(1 - p.progress, 2)) // repulsor: fast start, slows near the edge
         : edgeRadius * (1 - Math.pow(p.progress, 1.6)); // attractor: gentle start, accelerates into the center
       const anchorDist = outward ? 0 : edgeRadius;
+      const tailDist = trailBackFrom(headDist, anchorDist, segLen);
 
       const hx = center.x + Math.cos(p.angle) * headDist;
       const hy = center.y + Math.sin(p.angle) * headDist;
-      const ax = center.x + Math.cos(p.angle) * anchorDist;
-      const ay = center.y + Math.sin(p.angle) * anchorDist;
-      this._strokeTrail(ctx, ax, ay, hx, hy, gradientKey, p.progress, lineWidthMultiplier, dpr);
+      const tx = center.x + Math.cos(p.angle) * tailDist;
+      const ty = center.y + Math.sin(p.angle) * tailDist;
+      this._strokeTrail(ctx, tx, ty, hx, hy, cfg, p.progress, dpr);
     }
   }
 
-  _strokeTrail(ctx, x1, y1, x2, y2, gradientKey, progress, lineWidthMultiplier, dpr) {
+  _strokeTrail(ctx, x1, y1, x2, y2, cfg, progress, dpr) {
     const alphaMul = fadeOutAlpha(progress);
     if (alphaMul <= 0.01) return;
 
@@ -140,15 +158,15 @@ class ToolFx {
     // the main particles' speed-color idea); tail always samples the
     // gradient's t=0 end but fully transparent, so it fades to nothing
     // rather than showing a flat dim color.
-    const headRgb = sampleGradient(gradientKey, progress);
-    const tailRgb = sampleGradient(gradientKey, 0);
+    const headRgb = sampleGradient(cfg.gradient, progress, cfg.custom_gradient);
+    const tailRgb = sampleGradient(cfg.gradient, 0, cfg.custom_gradient);
 
     ctx.globalAlpha = alphaMul;
     ctx.lineCap = 'round';
 
     // Soft glow underlay, then a crisp gradient core line.
     ctx.strokeStyle = rgbaStr(headRgb, 0.1);
-    ctx.lineWidth = 4 * dpr * lineWidthMultiplier;
+    ctx.lineWidth = 4 * dpr * cfg.line_width;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -158,7 +176,7 @@ class ToolFx {
     gradient.addColorStop(0, rgbaStr(tailRgb, 0));
     gradient.addColorStop(1, rgbaStr(headRgb, 0.55));
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 1 * dpr * lineWidthMultiplier;
+    ctx.lineWidth = 1 * dpr * cfg.line_width;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -173,8 +191,9 @@ export class ToolFxManager {
     this._byId = new Map();
   }
 
-  // getToolConfig: (type) => { count, speed, gradient, line_width }, from
-  // fxConfig.js — read fresh each call so live panel edits apply instantly.
+  // getToolConfig: (type) => { count, speed, length, gradient,
+  // custom_gradient, line_width }, from fxConfig.js — read fresh each call
+  // so live panel edits apply instantly.
   step(activeTools, dt, getToolConfig) {
     const liveIds = new Set();
     for (const tool of activeTools) {
@@ -198,8 +217,7 @@ export class ToolFxManager {
     for (const tool of activeTools) {
       const fx = this._byId.get(tool.id);
       if (!fx) continue;
-      const cfg = getToolConfig(tool.type);
-      fx.draw(ctx, tool, dpr, cfg.gradient, cfg.line_width);
+      fx.draw(ctx, tool, dpr, getToolConfig(tool.type));
     }
   }
 }

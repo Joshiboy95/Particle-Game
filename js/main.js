@@ -71,8 +71,7 @@ function frame(now) {
   }
 
   const size = getSize();
-  const mainCfg = getMainConfig();
-  renderer.draw(level.pool, size.dpr, mainCfg.color_scheme, mainCfg.point_size, mainCfg.max_speed_for_color);
+  renderer.draw(level.pool, size.dpr, getMainConfig());
   ui.render(level, dt);
   ui.updateHUD(level);
 

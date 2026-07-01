@@ -9,9 +9,14 @@
 // code is needed. The tool's actual motion/rendering in toolFx.js still
 // needs its own code, same as any new tool does.
 
-import { DEFAULT_SCHEME } from './colorSchemes.js';
+import { DEFAULT_SCHEME, DEFAULT_CUSTOM_STOPS } from './colorSchemes.js';
 
 const KEY = 'particle_flow_fx_config';
+
+// Must match the particle pool / GPU buffer capacity (MAX_PARTICLES in
+// main.js and level.js) — this is a soft display cap on top of it, never
+// a way to exceed it.
+const MAX_MAIN_PARTICLES = 4096;
 
 export const GRADIENT_OPTIONS = [
   { value: 'ember', label: 'Ember' },
@@ -20,49 +25,51 @@ export const GRADIENT_OPTIONS = [
   { value: 'neon', label: 'Neon' },
 ];
 
-// Schema shape: { key, label, type: 'range'|'select', ...type-specific }
+// Schema shape: { key, label, type: 'range'|'select', ...type-specific }.
+// 'gradient'-keyed select params automatically get a per-element custom
+// color-stop editor in the panel (see ui.js) when "Eigener" is chosen.
 export const MAIN_SCHEMA = [
+  { key: 'particle_count', label: 'Partikelanzahl', type: 'range', min: 200, max: MAX_MAIN_PARTICLES, step: 100 },
   { key: 'point_size', label: 'Partikelgröße', type: 'range', min: 1, max: 8, step: 0.5 },
   { key: 'max_speed_for_color', label: 'Farb-Empfindlichkeit', type: 'range', min: 0.1, max: 1.5, step: 0.05 },
 ];
 
+const TOOL_FX_PARAM_TEMPLATE = [
+  { key: 'count', label: 'Partikelanzahl', type: 'range', min: 10, max: 150, step: 5 },
+  { key: 'speed', label: 'Geschwindigkeit', type: 'range', min: 0.2, max: 3, step: 0.1 },
+  { key: 'length', label: 'Länge', type: 'range', min: 1, max: 80, step: 1 },
+  { key: 'gradient', label: 'Farbfolge', type: 'select', options: GRADIENT_OPTIONS },
+  { key: 'line_width', label: 'Strichstärke', type: 'range', min: 0.3, max: 3, step: 0.1 },
+];
+
 export const TOOL_FX_SCHEMA = {
-  wind_jet: [
-    { key: 'count', label: 'Partikelanzahl', type: 'range', min: 10, max: 150, step: 5 },
-    { key: 'speed', label: 'Geschwindigkeit', type: 'range', min: 0.2, max: 3, step: 0.1 },
-    { key: 'gradient', label: 'Farbfolge', type: 'select', options: GRADIENT_OPTIONS },
-    { key: 'line_width', label: 'Strichstärke', type: 'range', min: 0.3, max: 3, step: 0.1 },
-  ],
-  attractor: [
-    { key: 'count', label: 'Partikelanzahl', type: 'range', min: 10, max: 150, step: 5 },
-    { key: 'speed', label: 'Geschwindigkeit', type: 'range', min: 0.2, max: 3, step: 0.1 },
-    { key: 'gradient', label: 'Farbfolge', type: 'select', options: GRADIENT_OPTIONS },
-    { key: 'line_width', label: 'Strichstärke', type: 'range', min: 0.3, max: 3, step: 0.1 },
-  ],
-  repulsor: [
-    { key: 'count', label: 'Partikelanzahl', type: 'range', min: 10, max: 150, step: 5 },
-    { key: 'speed', label: 'Geschwindigkeit', type: 'range', min: 0.2, max: 3, step: 0.1 },
-    { key: 'gradient', label: 'Farbfolge', type: 'select', options: GRADIENT_OPTIONS },
-    { key: 'line_width', label: 'Strichstärke', type: 'range', min: 0.3, max: 3, step: 0.1 },
-  ],
+  wind_jet: TOOL_FX_PARAM_TEMPLATE,
+  attractor: TOOL_FX_PARAM_TEMPLATE,
+  repulsor: TOOL_FX_PARAM_TEMPLATE,
 };
 
 const MAIN_DEFAULTS = {
   color_scheme: DEFAULT_SCHEME,
+  custom_gradient: [...DEFAULT_CUSTOM_STOPS],
+  particle_count: MAX_MAIN_PARTICLES,
   point_size: 3,
   max_speed_for_color: 0.5,
 };
 
+// Trail length defaults are short on purpose (dots, not lines) — the
+// player can lengthen them into streaks/comets via the panel.
 const TOOL_FX_DEFAULTS = {
-  wind_jet: { count: 50, speed: 1, gradient: 'neon', line_width: 1 },
-  attractor: { count: 70, speed: 1, gradient: 'ember', line_width: 1 },
-  repulsor: { count: 70, speed: 1, gradient: 'sunset', line_width: 1 },
+  wind_jet: { count: 50, speed: 1, length: 6, gradient: 'neon', custom_gradient: [...DEFAULT_CUSTOM_STOPS], line_width: 1 },
+  attractor: { count: 70, speed: 1, length: 6, gradient: 'ember', custom_gradient: [...DEFAULT_CUSTOM_STOPS], line_width: 1 },
+  repulsor: { count: 70, speed: 1, length: 6, gradient: 'sunset', custom_gradient: [...DEFAULT_CUSTOM_STOPS], line_width: 1 },
 };
 
 function defaultConfig() {
   return {
-    main: { ...MAIN_DEFAULTS },
-    tools: Object.fromEntries(Object.entries(TOOL_FX_DEFAULTS).map(([type, v]) => [type, { ...v }])),
+    main: { ...MAIN_DEFAULTS, custom_gradient: [...MAIN_DEFAULTS.custom_gradient] },
+    tools: Object.fromEntries(
+      Object.entries(TOOL_FX_DEFAULTS).map(([type, v]) => [type, { ...v, custom_gradient: [...v.custom_gradient] }])
+    ),
   };
 }
 
