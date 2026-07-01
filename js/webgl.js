@@ -86,8 +86,9 @@ export class ParticleRenderer {
 
   // pool: a particles.js ParticlePool (SoA: px, py, vx, vy, age, maxAge,
   // count). Reads straight from its typed arrays — no per-particle object
-  // churn. colorScheme: a colorSchemes.js scheme key.
-  draw(pool, dpr, colorScheme) {
+  // churn. colorScheme: a colorSchemes.js scheme key. pointSize/maxSpeed:
+  // live values from fxConfig.js's main-particle config.
+  draw(pool, dpr, colorScheme, pointSize, maxSpeedForColor) {
     const gl = this.gl;
     const n = Math.min(pool.count, this.maxParticles);
     const data = this.scratch;
@@ -98,7 +99,7 @@ export class ParticleRenderer {
       data[base + 1] = py[i];
 
       const speed = Math.hypot(vx[i], vy[i]);
-      const [r, g, b] = speedToColor(colorScheme, speed);
+      const [r, g, b] = speedToColor(colorScheme, speed, maxSpeedForColor);
       data[base + 2] = r;
       data[base + 3] = g;
       data[base + 4] = b;
@@ -123,7 +124,7 @@ export class ParticleRenderer {
     gl.enableVertexAttribArray(this.a_color);
     gl.vertexAttribPointer(this.a_color, 4, gl.FLOAT, false, stride, 8);
 
-    gl.uniform1f(this.u_pointSize, 3.0 * (dpr || 1));
+    gl.uniform1f(this.u_pointSize, (pointSize || 3.0) * (dpr || 1));
     gl.drawArrays(gl.POINTS, 0, n);
   }
 

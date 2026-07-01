@@ -76,10 +76,18 @@ const SCHEME_FUNCTIONS = {
   custom: customColor,
 };
 
-// Returns [r, g, b] each in 0..1, for a particle moving at normalized
-// speed `speed` (units/sec) under the given scheme key.
-export function speedToColor(schemeKey, speed) {
-  const t = Math.max(0, Math.min(1, speed / MAX_SPEED_FOR_COLOR));
+// Returns [r, g, b] each in 0..1 for position `t` (0..1) along a scheme's
+// gradient. Used directly by anything that already has a 0..1 fraction
+// (e.g. toolFx.js's per-particle trail progress).
+export function sampleGradient(schemeKey, t) {
+  const clamped = Math.max(0, Math.min(1, t));
   const fn = SCHEME_FUNCTIONS[schemeKey] || emberColor;
-  return fn(t);
+  return fn(clamped);
+}
+
+// Returns [r, g, b] each in 0..1, for a particle moving at normalized
+// speed `speed` (units/sec) under the given scheme key. `maxSpeed`
+// (defaults to MAX_SPEED_FOR_COLOR) is where the gradient saturates.
+export function speedToColor(schemeKey, speed, maxSpeed = MAX_SPEED_FOR_COLOR) {
+  return sampleGradient(schemeKey, speed / maxSpeed);
 }

@@ -12,6 +12,7 @@ import { drawObstacles } from './obstacles.js';
 import { getHandlePositionsCss } from './handles.js';
 import { ToolFxManager } from './toolFx.js';
 import { SCHEME_META } from './colorSchemes.js';
+import { MAIN_SCHEMA, TOOL_FX_SCHEMA, getMainConfig, setMainParam, getToolConfig, setToolParam, serializeForCopy } from './fxConfig.js';
 
 const TOOL_ORDER = ['wind_jet', 'attractor', 'repulsor'];
 const FILL_SMOOTHING_SECONDS = 1.0;
@@ -37,11 +38,12 @@ export class UI {
 
     this.settingsBtn = document.getElementById('settings-btn');
     this.settingsPanelEl = document.getElementById('settings-panel');
-    this.schemeListEl = document.getElementById('scheme-list');
+    this.fxPanelContentEl = document.getElementById('fx-panel-content');
     this.settingsBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       this.settingsPanelEl.classList.toggle('hidden');
     });
+    this.buildFxPanel();
 
     // Clicking outside the canvas (HUD/palette) clears the selection;
     // clicks on the field itself are already handled by dragController's
@@ -64,8 +66,94 @@ export class UI {
     this._levelModalTimer = null;
   }
 
-  buildSchemePanel(activeKey, onSelect) {
-    this.schemeListEl.innerHTML = '';
+  // Builds the whole settings panel content from fxConfig.js's schemas —
+  // one section for the main particle stream, one per tool type. Adding a
+  // new tool type later only needs a TOOL_FX_SCHEMA/TOOL_FX_DEFAULTS entry
+  // in fxConfig.js; this method picks it up automatically via TOOL_ORDER.
+  buildFxPanel() {
+    const container = this.fxPanelContentEl;
+    container.innerHTML = '';
+
+    const mainCfg = getMainConfig();
+    container.appendChild(this._buildSubheader('Partikel'));
+    container.appendChild(
+      this._buildSchemeSwatchList(mainCfg.color_scheme, (key) => {
+        setMainParam('color_scheme', key);
+      })
+    );
+    for (const paramDef of MAIN_SCHEMA) {
+      container.appendChild(this._buildRangeRow(paramDef, mainCfg[paramDef.key], (v) => setMainParam(paramDef.key, v)));
+    }
+
+    for (const type of TOOL_ORDER) {
+      const cfg = getToolConfig(type);
+      container.appendChild(this._buildSubheader(TOOL_DEFINITIONS[type].label));
+      for (const paramDef of TOOL_FX_SCHEMA[type]) {
+        if (paramDef.type === 'select') {
+          container.appendChild(this._buildSelectRow(paramDef, cfg[paramDef.key], (v) => setToolParam(type, paramDef.key, v)));
+        } else {
+          container.appendChild(this._buildRangeRow(paramDef, cfg[paramDef.key], (v) => setToolParam(type, paramDef.key, v)));
+        }
+      }
+    }
+
+    container.appendChild(this._buildCopyButton());
+  }
+
+  _buildSubheader(text) {
+    const el = document.createElement('div');
+    el.className = 'panel-subheader';
+    el.textContent = text;
+    return el;
+  }
+
+  _buildRangeRow(paramDef, value, onChange) {
+    const row = document.createElement('div');
+    row.className = 'param-row';
+    const label = document.createElement('label');
+    label.textContent = paramDef.label;
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = paramDef.min;
+    input.max = paramDef.max;
+    input.step = paramDef.step;
+    input.value = value;
+    const readout = document.createElement('span');
+    readout.className = 'param-value';
+    readout.textContent = value;
+    input.addEventListener('input', () => {
+      const v = parseFloat(input.value);
+      readout.textContent = v;
+      onChange(v);
+    });
+    row.appendChild(label);
+    row.appendChild(input);
+    row.appendChild(readout);
+    return row;
+  }
+
+  _buildSelectRow(paramDef, value, onChange) {
+    const row = document.createElement('div');
+    row.className = 'param-row';
+    const label = document.createElement('label');
+    label.textContent = paramDef.label;
+    const select = document.createElement('select');
+    for (const opt of paramDef.options) {
+      const option = document.createElement('option');
+      option.value = opt.value;
+      option.textContent = opt.label;
+      if (opt.value === value) option.selected = true;
+      select.appendChild(option);
+    }
+    select.addEventListener('change', () => onChange(select.value));
+    row.appendChild(label);
+    row.appendChild(select);
+    return row;
+  }
+
+  _buildSchemeSwatchList(activeKey, onSelect) {
+    const wrap = document.createElement('div');
+    wrap.className = 'scheme-list';
     for (const meta of SCHEME_META) {
       const row = document.createElement('div');
       row.className = 'scheme-row' + (meta.key === activeKey ? ' active' : '');
@@ -74,12 +162,32 @@ export class UI {
         `<span class="scheme-swatch" style="background:${meta.preview}"></span>` +
         `<span class="scheme-label">${meta.label}</span>`;
       row.addEventListener('click', () => {
-        this.schemeListEl.querySelectorAll('.scheme-row').forEach((r) => r.classList.remove('active'));
+        wrap.querySelectorAll('.scheme-row').forEach((r) => r.classList.remove('active'));
         row.classList.add('active');
         onSelect(meta.key);
       });
-      this.schemeListEl.appendChild(row);
+      wrap.appendChild(row);
     }
+    return wrap;
+  }
+
+  _buildCopyButton() {
+    const btn = document.createElement('button');
+    btn.className = 'copy-values-btn';
+    btn.textContent = 'Werte kopieren';
+    btn.addEventListener('click', async () => {
+      const text = serializeForCopy();
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = 'Kopiert!';
+      } catch {
+        btn.textContent = 'Kopieren fehlgeschlagen';
+      }
+      setTimeout(() => {
+        btn.textContent = 'Werte kopieren';
+      }, 1500);
+    });
+    return btn;
   }
 
   buildPalette(level, unlockedTools) {
@@ -143,9 +251,9 @@ export class UI {
     this._drawEmitters(ctx, level.def.emitters);
     this._drawTargets(ctx, level, dt);
 
-    this.toolFx.step(level.activeTools, dt);
+    this.toolFx.step(level.activeTools, dt, getToolConfig);
     this._drawToolBoundaries(ctx, level, dpr);
-    this.toolFx.draw(ctx, level.activeTools, dpr);
+    this.toolFx.draw(ctx, level.activeTools, dpr, getToolConfig);
     this._drawToolCenters(ctx, level, dpr);
 
     this._drawDragGhost(ctx, level);

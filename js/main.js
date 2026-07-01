@@ -9,7 +9,8 @@ import { Level } from './level.js';
 import { LEVEL_DATA } from './data/levels.js';
 import { UI } from './ui.js';
 import { DragController } from './drag.js';
-import { loadSave, writeSave, markLevelComplete } from './save.js';
+import { loadSave, markLevelComplete } from './save.js';
+import { getMainConfig } from './fxConfig.js';
 
 const MAX_PARTICLES = 4096;
 
@@ -35,13 +36,6 @@ const dragController = new DragController({
 });
 
 const ui = new UI({ uiCanvas, dragController });
-
-let colorScheme = save.settings.color_scheme;
-ui.buildSchemePanel(colorScheme, (key) => {
-  colorScheme = key;
-  save.settings.color_scheme = key;
-  writeSave(save);
-});
 
 function startLevel(index) {
   dragController.reset();
@@ -77,7 +71,8 @@ function frame(now) {
   }
 
   const size = getSize();
-  renderer.draw(level.pool, size.dpr, colorScheme);
+  const mainCfg = getMainConfig();
+  renderer.draw(level.pool, size.dpr, mainCfg.color_scheme, mainCfg.point_size, mainCfg.max_speed_for_color);
   ui.render(level, dt);
   ui.updateHUD(level);
 

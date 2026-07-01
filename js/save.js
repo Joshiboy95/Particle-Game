@@ -1,6 +1,7 @@
-// localStorage persistence, schema per design doc §9.4.
-
-import { DEFAULT_SCHEME } from './colorSchemes.js';
+// localStorage persistence, schema per design doc §9.4. Visual/fx tuning
+// (color scheme, tool particle counts, etc.) lives in its own
+// localStorage key via fxConfig.js instead of here — it's freeform tuning
+// data, not part of the game-progress schema this file covers.
 
 const KEY = 'particle_flow_save';
 
@@ -13,7 +14,6 @@ function defaultSave() {
     settings: {
       particle_count: 4096,
       sound_enabled: true,
-      color_scheme: DEFAULT_SCHEME,
     },
   };
 }
