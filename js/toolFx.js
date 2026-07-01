@@ -3,63 +3,68 @@
 // never touch the physics simulation in particles.js/tools.js and are not
 // influenced by any other tool; each tool owns an independent set.
 //
+// Each streak is a comet trail from a *fixed* spawn anchor to a *moving*
+// head, so it visibly grows/shrinks with progress instead of sliding as a
+// constant-length dash — with many particles at staggered phases, this
+// produces a dense burst of varying-length trails converging on (or
+// erupting from) the center, rather than a ring of uniform dashes.
+//
 // Motion per type:
-//  - wind_jet: streaks drift outward through the fixed cone in the wind
-//    direction, with a gentle sinusoidal wobble ("gusts").
-//  - attractor: streaks spawn at the ring edge and spiral inward
-//    (accelerating, curling), vanishing at the center — a graceful pull.
-//  - repulsor: streaks spawn at the center and blast straight outward
-//    (decelerating, no curl) to the ring edge — an energetic push.
+//  - wind_jet: anchored at the center, head drifts outward through the
+//    fixed cone in the wind direction (gentle sinusoidal "gust" wobble).
+//  - attractor: anchored at the ring edge, head races inward toward the
+//    center (accelerating, with a slow curl) — a graceful pull.
+//  - repulsor: anchored at the center, head blasts straight outward to
+//    the ring edge (decelerating, matching the force's real falloff).
 
 import { toPixel, toPixelLength } from './coords.js';
 import { WIND_JET_RANGE } from './tools.js';
 
-const COUNTS = { wind_jet: 32, attractor: 36, repulsor: 36 };
+const COUNTS = { wind_jet: 50, attractor: 70, repulsor: 70 };
 
-// Deliberately kept away from the main particles' near-white glow (see
-// webgl.js's fragment shader, ~rgba(0.75, 0.85, 1.0)) — each type leans on
-// a distinct, mostly dark/saturated slice of blue so the tool's own flow
-// never gets confused with the particle stream it's steering.
+// Head = near the convergence point (bright), tail = fully transparent
+// (fades out), glow = soft low-alpha underlay for a bit of bloom. Kept in
+// blue/cyan rather than the main particles' near-white glow (webgl.js's
+// fragment shader is ~rgba(0.75, 0.85, 1.0)) so a tool's own flow never
+// gets confused with the particle stream it's steering, and dimmer than
+// a "hot" reference look on purpose.
 const PALETTES = {
-  wind_jet: [
-    { r: 96, g: 165, b: 250, a: 0.85 },
-    { r: 59, g: 130, b: 246, a: 0.9 },
-    { r: 37, g: 99, b: 235, a: 0.85 },
-  ],
-  attractor: [
-    { r: 6, g: 182, b: 212, a: 0.9 },
-    { r: 8, g: 145, b: 178, a: 0.9 },
-    { r: 14, g: 116, b: 144, a: 0.85 },
-  ],
-  repulsor: [
-    { r: 30, g: 64, b: 175, a: 0.9 },
-    { r: 29, g: 78, b: 216, a: 0.9 },
-    { r: 37, g: 99, b: 235, a: 0.85 },
-  ],
+  wind_jet: {
+    head: 'rgba(147, 197, 253, 0.5)',
+    tail: 'rgba(37, 99, 235, 0)',
+    glow: 'rgba(59, 130, 246, 0.08)',
+  },
+  attractor: {
+    head: 'rgba(103, 232, 249, 0.55)',
+    tail: 'rgba(8, 47, 73, 0)',
+    glow: 'rgba(34, 211, 238, 0.1)',
+  },
+  repulsor: {
+    head: 'rgba(96, 165, 250, 0.55)',
+    tail: 'rgba(30, 58, 138, 0)',
+    glow: 'rgba(59, 130, 246, 0.1)',
+  },
 };
 
-function pick(arr) {
-  return arr[(Math.random() * arr.length) | 0];
-}
-
-function fadeAlpha(progress) {
-  const fadeIn = Math.min(1, progress / 0.12);
-  const fadeOut = Math.min(1, (1 - progress) / 0.18);
-  return Math.max(0, Math.min(fadeIn, fadeOut));
+function fadeOutAlpha(progress) {
+  // Only fades near the very end, just before respawn — the trail's own
+  // shrinking-to-nothing at progress=0 already handles the fade-in.
+  return Math.min(1, (1 - progress) / 0.15);
 }
 
 function makeParticle(type) {
   const p = {
     progress: Math.random(),
-    speed: 1.6 + Math.random() * 1.8,
-    color: pick(PALETTES[type]),
+    speed: 1.4 + Math.random() * 1.8,
   };
   if (type === 'wind_jet') {
     p.angleJitter = Math.random() - 0.5;
     p.wobblePhase = Math.random() * Math.PI * 2;
+    p.reachFactor = 0.6 + Math.random() * 0.6; // some streaks fall short, some overshoot
   } else {
     p.angle = Math.random() * Math.PI * 2;
-    p.curlSpeed = type === 'attractor' ? (0.5 + Math.random() * 0.7) * (Math.random() < 0.5 ? 1 : -1) : 0;
+    p.curlSpeed = type === 'attractor' ? (0.4 + Math.random() * 0.6) * (Math.random() < 0.5 ? 1 : -1) : 0;
+    p.edgeFactor = 0.7 + Math.random() * 0.6; // spawn radius varies around the ring edge
   }
   return p;
 }
@@ -73,7 +78,7 @@ class ToolFx {
   constructor(type) {
     this.type = type;
     this.particles = [];
-    const n = COUNTS[type] || 14;
+    const n = COUNTS[type] || 40;
     for (let i = 0; i < n; i++) {
       const p = makeParticle(type);
       p.progress = Math.random(); // stagger initial phases so they don't all spawn together
@@ -98,57 +103,67 @@ class ToolFx {
     const center = toPixel(tool.position.x, tool.position.y);
     const dirRad = (tool.params.direction || 0) * Math.PI / 180;
     const spreadRad = (tool.params.spreadAngle || 0) * Math.PI / 180;
-    const range = toPixelLength(WIND_JET_RANGE);
+    const baseRange = toPixelLength(WIND_JET_RANGE);
+    const palette = PALETTES.wind_jet;
 
     for (const p of this.particles) {
       const wobble = Math.sin(p.progress * Math.PI * 2 + p.wobblePhase) * 0.05;
       const angle = dirRad + p.angleJitter * spreadRad * 0.5 + wobble;
-      const tailProgress = Math.max(0, p.progress - 0.03);
-      const d2 = p.progress * range;
-      const d1 = tailProgress * range;
-      const x2 = center.x + Math.cos(angle) * d2;
-      const y2 = center.y + Math.sin(angle) * d2;
-      const x1 = center.x + Math.cos(angle) * d1;
-      const y1 = center.y + Math.sin(angle) * d1;
-      this._stroke(ctx, x1, y1, x2, y2, p, dpr);
+      const headDist = p.progress * baseRange * p.reachFactor;
+      const hx = center.x + Math.cos(angle) * headDist;
+      const hy = center.y + Math.sin(angle) * headDist;
+      // Anchored at the center — the trail lengthens outward as it grows.
+      this._strokeTrail(ctx, center.x, center.y, hx, hy, palette, p.progress, dpr);
     }
   }
 
   _drawRadial(ctx, tool, dpr, outward) {
     const center = toPixel(tool.position.x, tool.position.y);
-    const radius = toPixelLength(tool.radius);
+    const baseRadius = toPixelLength(tool.radius);
+    const palette = PALETTES[this.type];
 
     for (const p of this.particles) {
-      const tailProgress = Math.max(0, p.progress - 0.03);
-      const d2 = this._radialDistance(p.progress, radius, outward);
-      const d1 = this._radialDistance(tailProgress, radius, outward);
-      const x2 = center.x + Math.cos(p.angle) * d2;
-      const y2 = center.y + Math.sin(p.angle) * d2;
-      const x1 = center.x + Math.cos(p.angle) * d1;
-      const y1 = center.y + Math.sin(p.angle) * d1;
-      this._stroke(ctx, x1, y1, x2, y2, p, dpr);
+      const edgeRadius = baseRadius * p.edgeFactor;
+      const headDist = outward
+        ? edgeRadius * (1 - Math.pow(1 - p.progress, 2)) // repulsor: fast start, slows near the edge
+        : edgeRadius * (1 - Math.pow(p.progress, 1.6)); // attractor: gentle start, accelerates into the center
+      const anchorDist = outward ? 0 : edgeRadius;
+
+      const hx = center.x + Math.cos(p.angle) * headDist;
+      const hy = center.y + Math.sin(p.angle) * headDist;
+      const ax = center.x + Math.cos(p.angle) * anchorDist;
+      const ay = center.y + Math.sin(p.angle) * anchorDist;
+      this._strokeTrail(ctx, ax, ay, hx, hy, palette, p.progress, dpr);
     }
   }
 
-  _radialDistance(progress, radius, outward) {
-    if (outward) {
-      // repulsor: fast start, slows near the edge (matches force falloff)
-      return radius * (1 - Math.pow(1 - progress, 2));
-    }
-    // attractor: gentle start, accelerates into the center
-    return radius * (1 - Math.pow(progress, 1.6));
-  }
+  _strokeTrail(ctx, x1, y1, x2, y2, palette, progress, dpr) {
+    const alphaMul = fadeOutAlpha(progress);
+    if (alphaMul <= 0.01) return;
 
-  _stroke(ctx, x1, y1, x2, y2, p, dpr) {
-    const alpha = fadeAlpha(p.progress) * p.color.a;
-    if (alpha <= 0.01) return;
-    ctx.strokeStyle = `rgba(${p.color.r}, ${p.color.g}, ${p.color.b}, ${alpha})`;
-    ctx.lineWidth = 1.1 * dpr;
+    ctx.globalAlpha = alphaMul;
     ctx.lineCap = 'round';
+
+    // Soft glow underlay, then a crisp gradient core line (dim tail at the
+    // fixed anchor, brighter head at the moving tip).
+    ctx.strokeStyle = palette.glow;
+    ctx.lineWidth = 4 * dpr;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+
+    const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+    gradient.addColorStop(0, palette.tail);
+    gradient.addColorStop(1, palette.head);
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 1 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 1;
   }
 }
 
