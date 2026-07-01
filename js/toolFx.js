@@ -14,25 +14,27 @@
 import { toPixel, toPixelLength } from './coords.js';
 import { WIND_JET_RANGE } from './tools.js';
 
-const COUNTS = { wind_jet: 16, attractor: 18, repulsor: 18 };
+const COUNTS = { wind_jet: 32, attractor: 36, repulsor: 36 };
 
-// Each type leans on a different slice of the blue palette for a distinct
-// identity while staying in the game's established color language.
+// Deliberately kept away from the main particles' near-white glow (see
+// webgl.js's fragment shader, ~rgba(0.75, 0.85, 1.0)) — each type leans on
+// a distinct, mostly dark/saturated slice of blue so the tool's own flow
+// never gets confused with the particle stream it's steering.
 const PALETTES = {
   wind_jet: [
-    { r: 232, g: 236, b: 244, a: 0.9 },
-    { r: 191, g: 219, b: 254, a: 0.85 },
-    { r: 147, g: 197, b: 253, a: 0.7 },
+    { r: 96, g: 165, b: 250, a: 0.85 },
+    { r: 59, g: 130, b: 246, a: 0.9 },
+    { r: 37, g: 99, b: 235, a: 0.85 },
   ],
   attractor: [
-    { r: 34, g: 211, b: 238, a: 0.92 },
-    { r: 56, g: 189, b: 248, a: 0.85 },
-    { r: 14, g: 165, b: 233, a: 0.8 },
+    { r: 6, g: 182, b: 212, a: 0.9 },
+    { r: 8, g: 145, b: 178, a: 0.9 },
+    { r: 14, g: 116, b: 144, a: 0.85 },
   ],
   repulsor: [
-    { r: 224, g: 242, b: 254, a: 0.95 },
-    { r: 96, g: 165, b: 250, a: 0.88 },
-    { r: 186, g: 230, b: 253, a: 0.82 },
+    { r: 30, g: 64, b: 175, a: 0.9 },
+    { r: 29, g: 78, b: 216, a: 0.9 },
+    { r: 37, g: 99, b: 235, a: 0.85 },
   ],
 };
 
@@ -49,7 +51,7 @@ function fadeAlpha(progress) {
 function makeParticle(type) {
   const p = {
     progress: Math.random(),
-    speed: 0.35 + Math.random() * 0.4,
+    speed: 1.6 + Math.random() * 1.8,
     color: pick(PALETTES[type]),
   };
   if (type === 'wind_jet') {
@@ -81,7 +83,7 @@ class ToolFx {
 
   step(dt) {
     for (const p of this.particles) {
-      p.progress += p.speed * dt * 0.5;
+      p.progress += p.speed * dt;
       if (this.type !== 'wind_jet') p.angle += p.curlSpeed * dt;
       if (p.progress >= 1) respawn(p, this.type);
     }
@@ -101,7 +103,7 @@ class ToolFx {
     for (const p of this.particles) {
       const wobble = Math.sin(p.progress * Math.PI * 2 + p.wobblePhase) * 0.05;
       const angle = dirRad + p.angleJitter * spreadRad * 0.5 + wobble;
-      const tailProgress = Math.max(0, p.progress - 0.05);
+      const tailProgress = Math.max(0, p.progress - 0.03);
       const d2 = p.progress * range;
       const d1 = tailProgress * range;
       const x2 = center.x + Math.cos(angle) * d2;
@@ -117,7 +119,7 @@ class ToolFx {
     const radius = toPixelLength(tool.radius);
 
     for (const p of this.particles) {
-      const tailProgress = Math.max(0, p.progress - 0.05);
+      const tailProgress = Math.max(0, p.progress - 0.03);
       const d2 = this._radialDistance(p.progress, radius, outward);
       const d1 = this._radialDistance(tailProgress, radius, outward);
       const x2 = center.x + Math.cos(p.angle) * d2;
@@ -141,7 +143,7 @@ class ToolFx {
     const alpha = fadeAlpha(p.progress) * p.color.a;
     if (alpha <= 0.01) return;
     ctx.strokeStyle = `rgba(${p.color.r}, ${p.color.g}, ${p.color.b}, ${alpha})`;
-    ctx.lineWidth = 1.6 * dpr;
+    ctx.lineWidth = 1.1 * dpr;
     ctx.lineCap = 'round';
     ctx.beginPath();
     ctx.moveTo(x1, y1);
