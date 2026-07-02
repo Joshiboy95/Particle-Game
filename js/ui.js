@@ -45,6 +45,11 @@ export class UI {
     this.completeModalEl = document.getElementById('complete-modal');
     this.nextLevelBtn = document.getElementById('next-level-btn');
 
+    this.copyLevelBtn = document.getElementById('copy-level-btn');
+    this.copyLevelBtn.addEventListener('click', () => this._copyLevelReport(this.copyLevelBtn, '⧉'));
+    this.copyLevelCompleteBtn = document.getElementById('copy-level-complete-btn');
+    this.copyLevelCompleteBtn.addEventListener('click', () => this._copyLevelReport(this.copyLevelCompleteBtn, 'Level-Daten kopieren'));
+
     this.settingsBtn = document.getElementById('settings-btn');
     this.settingsPanelEl = document.getElementById('settings-panel');
     this.fxPanelContentEl = document.getElementById('fx-panel-content');
@@ -376,6 +381,7 @@ export class UI {
   }
 
   updateHUD(level) {
+    this._currentLevel = level;
     const pct = Math.max(0, level.budgetAvailable / level.def.budget) * 100;
     this.budgetFillEl.style.width = pct + '%';
     const text = `${level.budgetAvailable} / ${level.def.budget} EP`;
@@ -385,6 +391,23 @@ export class UI {
     }
     const efficiency = level.lastEfficiencies[0] || 0;
     this.throughputEl.textContent = Math.round(efficiency * 100) + '%';
+  }
+
+  // Shared by the in-HUD and complete-modal copy buttons — both just need
+  // the current level's exact tool placement/params for bug reports and
+  // reproduction (see Level.serializeReport in level.js).
+  async _copyLevelReport(btn, defaultLabel) {
+    if (!this._currentLevel) return;
+    const text = this._currentLevel.serializeReport();
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Kopiert!';
+    } catch {
+      btn.textContent = 'Kopieren fehlgeschlagen';
+    }
+    setTimeout(() => {
+      btn.textContent = defaultLabel;
+    }, 1500);
   }
 
   // Stacking (back to front): toolfx-canvas -> gl-canvas (main particles,

@@ -19,6 +19,7 @@
         <span id="budget-bar-text">0 / 0 EP</span>
       </div>
       <div id="throughput-readout">0%</div>
+      <button id="copy-level-btn" title="Level-Daten kopieren" aria-label="Level-Daten kopieren">⧉</button>
       <button id="level-select-btn" title="Level auswählen" aria-label="Level auswählen">☰</button>
       <button id="settings-btn" title="Einstellungen" aria-label="Einstellungen">⚙</button>
     </div>
@@ -45,7 +46,10 @@
     <div id="complete-modal" class="modal hidden">
       <div class="modal-box">
         <h2>Level abgeschlossen</h2>
-        <button id="next-level-btn">Nächstes Level</button>
+        <div class="modal-actions">
+          <button id="copy-level-complete-btn" class="secondary">Level-Daten kopieren</button>
+          <button id="next-level-btn">Nächstes Level</button>
+        </div>
       </div>
     </div>
 

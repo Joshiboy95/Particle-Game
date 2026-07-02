@@ -136,4 +136,37 @@ export class Level {
 
     this.holdProgress = Math.min(1, this.holdTimer / completion.hold_duration_seconds);
   }
+
+  // Exact reproduction data for the current placement — what tool, where,
+  // and with which params — as JSON matching the {type, position,
+  // direction, spreadAngle, strength, radius} shape used by the
+  // level-forge pipeline's own scripts, so a reported placement can be
+  // pasted directly into a test/verification script.
+  serializeReport() {
+    const tools = this.activeTools.map((tool) => {
+      const entry = {
+        type: tool.type,
+        position: { x: +tool.position.x.toFixed(4), y: +tool.position.y.toFixed(4) },
+      };
+      if (tool.type === 'wind_jet') {
+        entry.direction = +(tool.params.direction || 0).toFixed(2);
+        entry.spreadAngle = +(tool.params.spreadAngle || 0).toFixed(2);
+      }
+      entry.strength = +tool.strength.toFixed(4);
+      entry.radius = +tool.radius.toFixed(4);
+      return entry;
+    });
+    const report = {
+      levelId: this.def.id,
+      levelName: this.def.name,
+      budgetUsed: this.budgetUsed,
+      budget: this.def.budget,
+      efficiencyThreshold: this.def.completion.efficiency_threshold,
+      efficiency: +((this.lastEfficiencies[0] || 0)).toFixed(4),
+      state: this.state,
+      completed: this.completed,
+      tools,
+    };
+    return JSON.stringify(report, null, 2);
+  }
 }
