@@ -81,16 +81,49 @@ budget.
   cost/unlock data — nothing else in the pipeline changes.
 - Game state (progress, unlocked tools) persists to `localStorage` under
   `particle_flow_save` (schema per doc §9.4).
-- POC scope: 7 levels in `js/data/levels.js` (all buildable with the 3
-  implemented tools — ambient force and multi-emitter levels included;
-  the design doc's levels needing Vortex/Deflector/Portal-Paar aren't
-  built yet), 3 tools (Wind-Jet, Attraktor, Repulsor). A level-select
-  panel (`☰` button, top-right) lets the player jump to any level whose
-  predecessor is completed — same sequential-unlock rule as tools.
+- POC scope: 8 levels in `js/data/levels.js` (all buildable with the 3
+  implemented tools — ambient force, multi-emitter, and forge-generated
+  corridor levels included; the design doc's levels needing Vortex/
+  Deflector/Portal-Paar aren't built yet), 3 tools (Wind-Jet, Attraktor,
+  Repulsor). A level-select panel (`☰` button, top-right) lets the player
+  jump to any level whose predecessor is completed — same sequential-unlock
+  rule as tools.
+- `window.__debug` (`js/main.js`) exposes `getLevel()`, `startLevel(index)`,
+  and `fastForward(seconds, stepDt)` — a synchronous stepping loop that
+  advances a level's simulation without waiting on real time or rendering.
+  Kept intentionally (not test-only scaffolding) as the shared foundation
+  for both manual playtesting and `tools/level-forge/`.
 
 See `C:\Users\rosen\.claude\plans\frolicking-seeking-sky.md` for the full
 file-by-file POC implementation plan (module responsibilities, per-frame
 loop order, force formulas, drag/state machines).
+
+## Level authoring
+
+New levels are built trail-first, not maze-first: place 2-3 tools (at least
+two distinct types), trace the curved path they naturally produce in an
+obstacle-free field, then generate walls that hug that trail — leaving open
+only a corridor around it. Curve complexity (bends, tortuosity, tool
+diversity) is the deliberate difficulty knob, not hand-authored geometry.
+
+`tools/level-forge/` implements this as a dev-only Node+Playwright pipeline
+(its own `package.json`, isolated from the shipped game — nothing under
+`js/` ever imports from it):
+- `corridor.js` — pure math: grids the field, measures distance from a trail
+  polyline, merges blocked cells into `obstacles.js`-compatible AABB rects.
+- `trace.js` — drives the running game via `window.__debug` to trace a
+  loadout's centerline plus its two emitter-spread edges.
+- `validate.js` — loads candidate obstacles against the real emitter/spread,
+  runs `fastForward(30)`, and auto-tunes corridor width until the achieved
+  efficiency lands in a healthy band (not near-zero, not near-100%).
+- `emit.js` — assembles the final `LEVEL_DATA`-shaped object and a
+  difficulty report (turning count, tortuosity, corridor tightness).
+- `forge.js` — CLI wiring the above end to end: `node forge.js <loadout.js>`.
+
+Run `npm install` once inside `tools/level-forge/` before first use. See
+`tools/level-forge/loadouts/level8.js` for a worked example, and
+`js/data/levels.js`'s Level 8 entry for the polished, hand-reformatted
+result of its raw pipeline output (`tools/level-forge/out/level-8.js`).
 
 ## Open decisions (doc §12)
 

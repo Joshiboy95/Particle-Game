@@ -1,0 +1,16 @@
+{
+  "name": "level-forge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Trail-first level authoring pipeline for Particle Flow — dev-only tool, not part of the shipped game.",
+  "type": "commonjs",
+  "bin": {
+    "level-forge": "./forge.js"
+  },
+  "scripts": {
+    "forge": "node forge.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1"
+  }
+}
