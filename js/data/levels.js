@@ -6,7 +6,7 @@ export const LEVEL_DATA = [
     id: 1,
     name: 'Erster Kontakt',
     description: 'Freie Bahn, kein Hindernis. Nutzen Sie den Wind-Jet, um den Partikelstrom zum Ziel zu bündeln.',
-    budget: 30,
+    budget: 35,
     emitter_rate: 200,
     particle_lifetime: 10.0,
     ambient_force: { x: 0, y: 0 },
@@ -29,8 +29,8 @@ export const LEVEL_DATA = [
   {
     id: 2,
     name: 'Die Mauer',
-    description: 'Eine Wand blockiert den direkten Weg. Nutzen Sie den Attraktor, um die Partikel herumzulenken.',
-    budget: 50,
+    description: 'Eine Wand blockiert den direkten Weg. Nutzen Sie Wind-Jet und Attraktor gemeinsam, um die Partikel durch die Lücke und zurück zum Ziel zu lenken.',
+    budget: 55,
     emitter_rate: 200,
     particle_lifetime: 10.0,
     ambient_force: { x: 0, y: 0 },
@@ -50,7 +50,7 @@ export const LEVEL_DATA = [
       hold_duration_seconds: 3.0,
     },
     unlocks_on_complete: 'repulsor',
-    hints: ['Ein Attraktor knapp über der Wandkante lenkt die Partikel elegant vorbei.'],
+    hints: ['Ein steiler Wind-Jet an der Quelle drückt den Strom durch die Lücke; ein Attraktor dahinter fängt ihn ab und lenkt ihn zurück zum Ziel.'],
   },
   {
     id: 3,

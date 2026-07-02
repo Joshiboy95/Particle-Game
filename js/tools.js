@@ -12,7 +12,7 @@
 // element. Attractor/Repulsor expose a single visual "power" handle on
 // the ring edge; radius and strength both derive from where that handle
 // sits, so there's effectively one on-canvas control.
-export const WIND_JET_RANGE = 0.2;
+export const WIND_JET_RANGE = 0.35;
 export const WIND_JET_MIN_STRENGTH = 0.15;
 export const WIND_JET_MAX_STRENGTH = 0.45; // also the particle speed cap at full extension
 export const WIND_JET_MIN_LEN_CSS = 30;
@@ -51,10 +51,15 @@ export const TOOL_DEFINITIONS = {
   wind_jet: {
     type: 'wind_jet',
     label: 'Wind-Jet',
-    cost: 10,
+    // Most expensive tool despite unlocking first: it's placeable/aimable
+    // anywhere and now acts as a reliable velocity-steer (not a fickle
+    // force), strictly more powerful per-EP than the position-anchored
+    // radial tools if priced the same. Set so exactly one fits Level 1's
+    // budget with nothing left over.
+    cost: 35,
     unlockedAtLevel: 1,
     defaultRadius: WIND_JET_RANGE,
-    defaultStrength: 0.4,
+    defaultStrength: 0.25,
     defaultParams: { direction: 0, spreadAngle: 30 },
   },
   attractor: {

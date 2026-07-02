@@ -57,11 +57,47 @@ function goToNextLevel() {
   }
 }
 
+let debugFastForwarding = false;
+window.__debug = {
+  getLevel: () => level,
+  startLevel,
+  // Advances the level's simulation `seconds` of *game* time using fixed
+  // dt steps in a tight synchronous loop — no rendering, no waiting on
+  // real wall-clock time. Lets a playtest script simulate 30s of play in
+  // well under a second. Blocks the real rAF loop from double-stepping
+  // while it runs (single-threaded JS: no rAF callback fires mid-loop
+  // anyway, this just skips the *next* real frame's step too).
+  fastForward(seconds, stepDt = 1 / 60) {
+    debugFastForwarding = true;
+    const steps = Math.round(seconds / stepDt);
+    let simNow = performance.now();
+    for (let i = 0; i < steps; i++) {
+      simNow += stepDt * 1000;
+      level.step(stepDt, simNow);
+      if (level.completed) break;
+    }
+    debugFastForwarding = false;
+    lastTime = performance.now();
+    return {
+      state: level.state,
+      completed: level.completed,
+      holdProgress: level.holdProgress,
+      efficiencies: Array.from(level.lastEfficiencies),
+      budgetUsed: level.budgetUsed,
+      poolCount: level.pool.count,
+    };
+  },
+};
 let lastTime = performance.now();
 
 function frame(now) {
   const dt = Math.min(0.033, (now - lastTime) / 1000);
   lastTime = now;
+
+  if (debugFastForwarding) {
+    requestAnimationFrame(frame);
+    return;
+  }
 
   level.step(dt, now);
 
