@@ -81,7 +81,7 @@ budget.
   cost/unlock data — nothing else in the pipeline changes.
 - Game state (progress, unlocked tools) persists to `localStorage` under
   `particle_flow_save` (schema per doc §9.4).
-- POC scope: 8 levels in `js/data/levels.js` (all buildable with the 3
+- POC scope: 9 levels in `js/data/levels.js` (all buildable with the 3
   implemented tools — ambient force, multi-emitter, and forge-generated
   corridor levels included; the design doc's levels needing Vortex/
   Deflector/Portal-Paar aren't built yet), 3 tools (Wind-Jet, Attraktor,

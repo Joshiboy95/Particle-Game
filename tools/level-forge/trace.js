@@ -80,7 +80,14 @@ async function traceLoadout({ baseUrl, loadout, emitter, saveOverride }) {
 
     const traceOnce = async (headingRad) => {
       await page.evaluate((idx) => window.__debug.startLevel(idx), BLANK_CANVAS_LEVEL_INDEX);
-      await page.evaluate(() => { window.__debug.getLevel().def.obstacles = []; });
+      await page.evaluate(() => {
+        const level = window.__debug.getLevel();
+        level.def.obstacles = [];
+        // Also neutralize Level 1's own target — otherwise a trail that
+        // happens to pass near (0.92, 0.5) gets prematurely "captured" and
+        // the trace cuts short before reaching its actual natural end.
+        level.def.targets = [{ id: 't1', position: { x: -1, y: -1 }, radius: 0.001 }];
+      });
       await placeLoadout(page, loadout);
       return traceOneParticle(page, { emitter: emitter.position, headingRad });
     };
