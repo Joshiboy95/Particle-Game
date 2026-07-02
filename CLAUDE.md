@@ -81,13 +81,15 @@ budget.
   cost/unlock data — nothing else in the pipeline changes.
 - Game state (progress, unlocked tools) persists to `localStorage` under
   `particle_flow_save` (schema per doc §9.4).
-- POC scope: 9 levels in `js/data/levels.js` (all buildable with the 3
+- POC scope: 10 levels in `js/data/levels.js` (all buildable with the 3
   implemented tools — ambient force, multi-emitter, and forge-generated
   corridor levels included; the design doc's levels needing Vortex/
   Deflector/Portal-Paar aren't built yet), 3 tools (Wind-Jet, Attraktor,
   Repulsor). A level-select panel (`☰` button, top-right) lets the player
   jump to any level whose predecessor is completed — same sequential-unlock
-  rule as tools.
+  rule as tools. Level 10 is the first level verified via an adversarial
+  search to be genuinely unsolvable with only two tools, not just "intended"
+  to need more — see its comment in `js/data/levels.js`.
 - `window.__debug` (`js/main.js`) exposes `getLevel()`, `startLevel(index)`,
   and `fastForward(seconds, stepDt)` — a synchronous stepping loop that
   advances a level's simulation without waiting on real time or rendering.
