@@ -55,7 +55,7 @@ export const LEVEL_DATA = [
   {
     id: 3,
     name: 'Das L',
-    description: 'Ein L-förmiges Hindernis versperrt den Weg. Nutzen Sie den Repulsor, um den Strom von der Innenwand fernzuhalten.',
+    description: 'Ein L-förmiges Hindernis versperrt den Weg — der Vorsprung reicht tiefer als bei der Mauer zuvor. Ein einfacher Umweg reicht hier nicht mehr.',
     budget: 60,
     emitter_rate: 200,
     particle_lifetime: 10.0,
@@ -68,7 +68,7 @@ export const LEVEL_DATA = [
     ],
     obstacles: [
       { type: 'rect', x: 0.42, y: 0.0, width: 0.05, height: 0.55, behavior: 'kill' },
-      { type: 'rect', x: 0.42, y: 0.5, width: 0.3, height: 0.05, behavior: 'kill' },
+      { type: 'rect', x: 0.42, y: 0.5, width: 0.3, height: 0.2, behavior: 'kill' },
     ],
     available_tools: ['wind_jet', 'attractor', 'repulsor'],
     completion: {
@@ -77,7 +77,7 @@ export const LEVEL_DATA = [
       hold_duration_seconds: 3.0,
     },
     unlocks_on_complete: null,
-    hints: ['Der Repulsor kann genutzt werden, um den Strom weg von der L-Innenwand zu drücken.'],
+    hints: ['Ein steilerer Wind-Jet und ein stärkerer Attraktor als bei der Mauer nötig — der Strom muss tiefer tauchen, bevor er zurück zum Ziel kann.'],
   },
   {
     id: 4,
@@ -86,7 +86,7 @@ export const LEVEL_DATA = [
     budget: 70,
     emitter_rate: 200,
     particle_lifetime: 10.0,
-    ambient_force: { x: -0.05, y: 0 },
+    ambient_force: { x: -0.08, y: 0 },
     emitters: [
       { id: 'e1', position: { x: 0.05, y: 0.5 }, direction: 0.0, spread_angle: 20.0 },
     ],
@@ -101,12 +101,12 @@ export const LEVEL_DATA = [
       hold_duration_seconds: 3.0,
     },
     unlocks_on_complete: null,
-    hints: ['Der Gegenwind schwächt jeden Schub ab — planen Sie mit etwas Reserve.'],
+    hints: ['Ein einzelner Wind-Jet verliert unterwegs zu viel Schwung — platzieren Sie einen zweiten weiter stromabwärts, um den Strom erneut zu beschleunigen.'],
   },
   {
     id: 5,
     name: 'Der Engpass',
-    description: 'Eine schmale Öffnung zwischen zwei Wänden verlangt präzises Funneling.',
+    description: 'Die Öffnung liegt nicht auf Höhe des Emitters. Lenken Sie den Strom hindurch und wieder zurück zum Ziel.',
     budget: 65,
     emitter_rate: 200,
     particle_lifetime: 10.0,
@@ -118,8 +118,8 @@ export const LEVEL_DATA = [
       { id: 't1', position: { x: 0.92, y: 0.5 }, radius: 0.045 },
     ],
     obstacles: [
-      { type: 'rect', x: 0.5, y: 0.0, width: 0.04, height: 0.42, behavior: 'kill' },
-      { type: 'rect', x: 0.5, y: 0.58, width: 0.04, height: 0.42, behavior: 'kill' },
+      { type: 'rect', x: 0.5, y: 0.0, width: 0.04, height: 0.28, behavior: 'kill' },
+      { type: 'rect', x: 0.5, y: 0.38, width: 0.04, height: 0.62, behavior: 'kill' },
     ],
     available_tools: ['wind_jet', 'attractor', 'repulsor'],
     completion: {
@@ -128,7 +128,7 @@ export const LEVEL_DATA = [
       hold_duration_seconds: 3.0,
     },
     unlocks_on_complete: null,
-    hints: ['Bündeln Sie den Strom kurz vor der Engstelle, damit er nicht an den Wänden verloren geht.'],
+    hints: ['Ein schräger Wind-Jet trägt den Strom durch die versetzte Lücke; ein Attraktor dahinter lenkt ihn zurück auf Zielhöhe.'],
   },
   {
     id: 6,
