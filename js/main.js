@@ -89,6 +89,14 @@ window.__debug = {
   },
 };
 let lastTime = performance.now();
+// Simulated-time clock (ms), advanced by `dt` each stepped frame rather than
+// read from performance.now(). The ThroughputMonitor's sliding window is
+// keyed off this value, not wall-clock time — on a slow/laggy frame (dt
+// capped below the real elapsed gap), fewer sim-seconds pass, so the
+// window must shrink with them. Anchoring the window to wall-clock time
+// instead would silently deflate measured efficiency under lag, punishing
+// players for frame-rate drops rather than tool placement.
+let simTime = 0;
 
 function frame(now) {
   const dt = Math.min(0.033, (now - lastTime) / 1000);
@@ -99,7 +107,8 @@ function frame(now) {
     return;
   }
 
-  level.step(dt, now);
+  simTime += dt * 1000;
+  level.step(dt, simTime);
 
   if (level.completed && !handledComplete) {
     handledComplete = true;
