@@ -155,6 +155,49 @@ function tortuosity(trail) {
   return pathLength(trail) / straight;
 }
 
+// --- Exhaustive N-segment straight-path checker ---
+//
+// A tool that only steers velocity toward a fixed target vector (Wind-Jet)
+// can only ever produce ONE straight segment; a combo of K such tools can
+// produce at most a (K+1)-vertex polyline (K "elbows"). This is a hard,
+// unconditional guarantee, unlike an adversarial physics search: if NO
+// straight polyline with `elbowCount` elbows can get from start to target
+// without crossing an obstacle, then no combination of `elbowCount`
+// steering-only tools can either, regardless of how they're tuned. Used to
+// prove (not just empirically test) that a hairpin/backtrack corridor
+// genuinely requires more tools than a naive straight-line count suggests —
+// see js/data/levels.js's Level 10 for the level this was built for.
+function anyStraightPathExists({ start, target, obstacles, elbowCount = 1, gridN = 60, segmentSamples = 200 }) {
+  function pointBlocked(px, py) {
+    for (const o of obstacles) {
+      if (px >= o.x && px <= o.x + o.width && py >= o.y && py <= o.y + o.height) return true;
+    }
+    return false;
+  }
+  function segmentClear(a, b) {
+    for (let i = 0; i <= segmentSamples; i++) {
+      const t = i / segmentSamples;
+      if (pointBlocked(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)) return false;
+    }
+    return true;
+  }
+  // Recursive search over elbow positions on a gridN x gridN grid.
+  function search(from, remainingElbows) {
+    if (remainingElbows === 0) return segmentClear(from, target) ? [] : null;
+    for (let i = 0; i <= gridN; i++) {
+      for (let j = 0; j <= gridN; j++) {
+        const elbow = { x: i / gridN, y: j / gridN };
+        if (!segmentClear(from, elbow)) continue;
+        const rest = search(elbow, remainingElbows - 1);
+        if (rest) return [elbow, ...rest];
+      }
+    }
+    return null;
+  }
+  const elbows = search(start, elbowCount);
+  return { exists: !!elbows, elbows };
+}
+
 module.exports = {
   distPointToSegment,
   minDistToPolylines,
@@ -164,4 +207,5 @@ module.exports = {
   pathLength,
   turningCount,
   tortuosity,
+  anyStraightPathExists,
 };
